@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from typing import cast
+
 import requests
+
 import streamlit as st
 import streamlit.components.v1 as components
-
 from masterclass_mlops.config import get_settings
 from masterclass_mlops.schemas import ClassifyResponse, LoginResponse
 from masterclass_mlops.streamlit_ui.grafana import (
@@ -57,7 +58,10 @@ def render_monitoring_cockpit(grafana_url: str) -> None:
 
 def render_observability_cockpit(grafana_url: str, last_request_id: str | None) -> None:
     st.subheader("Observability Cockpit")
-    st.caption("Use logs, traces, and the latest request identifier to investigate the cause of a problem.")
+    st.caption(
+        "Use logs, traces, and the latest request identifier to investigate the cause "
+        "of a problem."
+    )
     if last_request_id is not None:
         st.info(f"Latest request id from the UI flow: `{last_request_id}`")
     components.iframe(
@@ -160,10 +164,14 @@ else:
                 2. NGINX applies rate limiting and forwards traffic to the gateway.
                 3. The gateway validates the session in SQLite.
                 4. The gateway forwards prediction requests to the model service.
-                5. Prometheus scrapes API metrics and the observability stack collects logs and traces.
+                5. Prometheus scrapes API metrics and the observability stack collects
+                   logs and traces.
                 """
             )
-            st.info("Use the admin account to open the embedded Grafana monitoring and observability cockpits.")
+            st.info(
+                "Use the admin account to open the embedded Grafana monitoring and "
+                "observability cockpits."
+            )
 
     if is_admin:
         with rendered_tabs[1]:
