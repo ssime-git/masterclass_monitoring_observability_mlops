@@ -19,7 +19,7 @@ Use `main` as the entrypoint for the workshop structure, then move branch by bra
 
 ## Model Used Across the Workshop
 
-The repository currently uses a deterministic keyword-based classifier implemented in [src/masterclass_mlops/model_logic.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/masterclass_mlops/model_logic.py) on the runnable branches.
+The runnable branches use a deterministic keyword-based classifier implemented in the `src/shared/` layer.
 
 It is not a trained statistical model. This is intentional:
 
@@ -28,6 +28,12 @@ It is not a trained statistical model. This is intentional:
 - students focus on architecture, monitoring, and observability
 
 If you later want a trained model, this repository already gives you the right service boundaries to swap the inference logic without redesigning the system.
+
+The runnable branches now follow a service-first source layout:
+
+- `src/services/`: gateway and model service
+- `src/ui/`: Streamlit application
+- `src/shared/`: shared models, schemas, persistence, metrics, and support code
 
 ## Target Architecture
 
