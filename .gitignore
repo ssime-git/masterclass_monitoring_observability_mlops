@@ -15,3 +15,6 @@ data/tempo/
 dist/
 build/
 htmlcov/
+*.log
+Masterclass_Monitoring_Observabilite.pptx
+Masterclass_Monitoring_Observability_EN.pptx
