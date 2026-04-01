@@ -26,6 +26,22 @@ def test_classify_returns_history(client) -> None:
     assert len(payload["history"]) == 1
 
 
+def test_classify_returns_502_when_model_service_unavailable(failing_client) -> None:
+    token = failing_client.post(
+        "/auth/login",
+        json={"username": "alice", "password": "mlops-demo"},
+    ).json()["access_token"]
+
+    response = failing_client.post(
+        "/api/classify",
+        json={"text": "My payment failed and I need a refund."},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Model service is unavailable"
+
+
 def test_sessions_are_isolated(client) -> None:
     alice_token = client.post(
         "/auth/login",

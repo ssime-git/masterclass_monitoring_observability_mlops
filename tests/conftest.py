@@ -26,6 +26,11 @@ class MockModelTransport(httpx.AsyncBaseTransport):
         )
 
 
+class FailingModelTransport(httpx.AsyncBaseTransport):
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("Connection refused")
+
+
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     return Settings(
@@ -47,6 +52,21 @@ def client(settings: Settings) -> Generator[TestClient, None, None]:
     app.state.settings = settings
     app.state.session_factory = session_factory
     app.state.http_client = httpx.AsyncClient(transport=MockModelTransport())
+    with TestClient(app) as test_client:
+        yield test_client
+    asyncio.run(app.state.http_client.aclose())
+
+
+@pytest.fixture
+def failing_client(settings: Settings) -> Generator[TestClient, None, None]:
+    session_factory = build_session_factory(settings)
+    initialize_database(session_factory.kw["bind"])
+    with session_factory() as db_session:
+        seed_demo_users(db_session, settings)
+
+    app.state.settings = settings
+    app.state.session_factory = session_factory
+    app.state.http_client = httpx.AsyncClient(transport=FailingModelTransport())
     with TestClient(app) as test_client:
         yield test_client
     asyncio.run(app.state.http_client.aclose())

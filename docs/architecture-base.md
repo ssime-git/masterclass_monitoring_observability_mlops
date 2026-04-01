@@ -52,6 +52,24 @@ The goal is not to train a model. The goal is to understand how a small ML-enabl
 - Rate limiting happens before the gateway, at the `nginx` layer.
 - SQLite is mounted from `data/`, so the application state remains inspectable from the host machine.
 
+## Metrics Endpoints
+
+Both the gateway and the model service expose a `/metrics` endpoint in Prometheus format.
+
+```bash
+curl -s http://localhost:8080/metrics | grep masterclass_
+```
+
+Available metrics in this branch:
+
+- `masterclass_http_requests_total` — request count by service, method, path, and HTTP status
+- `masterclass_http_request_duration_seconds` — request latency histogram by service, method, and path
+- `masterclass_http_in_progress_requests` — in-flight request count by service
+- `masterclass_active_sessions` — count of non-expired sessions tracked by the gateway
+- `masterclass_predictions_total` — prediction count by service and classification label
+
+These metrics are not collected by anything in this branch. They exist to support the monitoring layer added in `02-monitoring-prometheus-grafana`.
+
 ## What to Inspect
 
 - Where the public boundary sits
