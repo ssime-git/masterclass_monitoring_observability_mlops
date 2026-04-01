@@ -11,16 +11,4 @@ COPY README.md ./
 COPY src ./src
 RUN uv sync --no-dev
 
-CMD [
-  "uv",
-  "run",
-  "streamlit",
-  "run",
-  "src/masterclass_mlops/streamlit_ui/app.py",
-  "--server.address",
-  "0.0.0.0",
-  "--server.port",
-  "8501",
-  "--server.headless",
-  "true"
-]
+CMD ["uv", "run", "streamlit", "run", "src/masterclass_mlops/streamlit_ui/app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]

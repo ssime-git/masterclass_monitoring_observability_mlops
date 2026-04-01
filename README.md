@@ -66,3 +66,5 @@ The monitoring branch adds [docs/monitoring-prometheus-grafana.md](/Users/seb/Do
 
 - Grafana: `http://localhost:3000`
 - Prometheus: `http://localhost:9090`
+
+The observability branch adds [docs/observability-otel.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/observability-otel.md) and keeps Grafana as the main entrypoint for logs and traces.

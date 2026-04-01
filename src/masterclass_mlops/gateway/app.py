@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from secrets import token_urlsafe
 
 import httpx
 import uvicorn
 from fastapi import Depends, FastAPI, Request, Response, status
+from opentelemetry import propagate, trace
 from sqlalchemy.orm import Session
 
 from masterclass_mlops.bootstrap import initialize_database, seed_demo_users
@@ -21,6 +24,13 @@ from masterclass_mlops.gateway.service import (
 )
 from masterclass_mlops.metrics import ACTIVE_SESSIONS, metrics_response, record_http_metrics
 from masterclass_mlops.models import SessionRecord
+from masterclass_mlops.observability import (
+    bind_request_context,
+    configure_logging,
+    configure_tracing,
+    reset_request_context,
+    update_request_context,
+)
 from masterclass_mlops.repositories import SessionRepository
 from masterclass_mlops.schemas import (
     ClassifyResponse,
@@ -31,16 +41,20 @@ from masterclass_mlops.schemas import (
     PredictionResponse,
 )
 
+logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = getattr(app.state, "settings", get_settings())
+    configure_logging(settings)
     session_factory = getattr(app.state, "session_factory", build_session_factory(settings))
     initialize_database(session_factory.kw["bind"])
     with session_factory() as db_session:
         seed_demo_users(db_session, settings)
         active_sessions = SessionRepository(db_session).count_active()
         ACTIVE_SESSIONS.labels(service=settings.app_name).set(active_sessions)
+    logger.info("gateway_started")
 
     app.state.settings = settings
     app.state.session_factory = session_factory
@@ -48,6 +62,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     http_client = getattr(app.state, "http_client", httpx.AsyncClient())
     created_http_client = not hasattr(app.state, "http_client")
     app.state.http_client = http_client
+    configure_tracing(app, settings)
     try:
         yield
     finally:
@@ -56,6 +71,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="gateway", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def request_context_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    request_id = request.headers.get("X-Request-ID", token_urlsafe(8))
+    tokens = bind_request_context(
+        request_id=request_id,
+        user_id=request.headers.get("X-User-ID"),
+        session_id=request.headers.get("X-Session-ID"),
+    )
+    try:
+        parent_context = propagate.extract(dict(request.headers))
+        with tracer.start_as_current_span(
+            f"{request.method} {request.url.path}",
+            context=parent_context,
+        ):
+            response = await call_next(request)
+    finally:
+        reset_request_context(tokens)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 @app.middleware("http")
@@ -94,7 +133,7 @@ def logout_view(
     session_record: SessionRecord = Depends(get_current_session),
     db_session: Session = Depends(get_db_session),
 ) -> Response:
-    del session_record
+    update_request_context(user_id=str(session_record.user_id), session_id=str(session_record.id))
     settings: Settings = request.app.state.settings
     token = request.state.session_token
     logout(db_session, token, settings)
@@ -108,6 +147,7 @@ async def classify(
     session_record: SessionRecord = Depends(get_current_session),
     db_session: Session = Depends(get_db_session),
 ) -> ClassifyResponse:
+    update_request_context(user_id=str(session_record.user_id), session_id=str(session_record.id))
     settings: Settings = request.app.state.settings
     result = await request_prediction(request.app.state.http_client, settings, payload.text)
     history = list(record_prediction(db_session, session_record, payload.text, result, settings))

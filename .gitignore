@@ -9,6 +9,7 @@ __pycache__/
 .DS_Store
 data/*.db
 data/grafana/
+data/logs/
 data/loki/
 data/prometheus/
 data/tempo/

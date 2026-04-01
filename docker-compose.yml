@@ -8,10 +8,16 @@ services:
       DATABASE_URL: sqlite:////app/data/masterclass.db
       MODEL_SERVICE_URL: http://model-service:8001
       SESSION_TTL_MINUTES: 90
+      LOG_FILE_PATH: /app/logs/gateway.log
+      OTEL_EXPORTER_ENDPOINT: http://otel-collector:4318
+      SERVICE_VERSION: 0.1.0
+      MODEL_VERSION: keyword-v1
     volumes:
       - ./data:/app/data
+      - ./data/logs:/app/logs
     depends_on:
       - model-service
+      - otel-collector
     expose:
       - "8000"
 
@@ -22,6 +28,14 @@ services:
     environment:
       APP_NAME: model-service
       INFERENCE_DELAY_SECONDS: 0.0
+      LOG_FILE_PATH: /app/logs/model-service.log
+      OTEL_EXPORTER_ENDPOINT: http://otel-collector:4318
+      SERVICE_VERSION: 0.1.0
+      MODEL_VERSION: keyword-v1
+    volumes:
+      - ./data/logs:/app/logs
+    depends_on:
+      - otel-collector
     expose:
       - "8001"
 
@@ -44,6 +58,7 @@ services:
       - "8080:8080"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/logs/nginx:/var/log/nginx
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:1.4.2
@@ -70,6 +85,8 @@ services:
     image: grafana/grafana:11.6.0
     depends_on:
       - prometheus
+      - loki
+      - tempo
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -78,3 +95,43 @@ services:
     volumes:
       - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./data/grafana:/var/lib/grafana
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    command:
+      - --config=/etc/otelcol-contrib/config.yaml
+    expose:
+      - "4318"
+    volumes:
+      - ./docker/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+  tempo:
+    image: grafana/tempo:2.7.1
+    command:
+      - -config.file=/etc/tempo/config.yml
+    expose:
+      - "3200"
+      - "4318"
+    volumes:
+      - ./docker/tempo/tempo.yaml:/etc/tempo/config.yml:ro
+      - ./data/tempo:/tmp/tempo
+
+  loki:
+    image: grafana/loki:3.4.2
+    command:
+      - -config.file=/etc/loki/config.yml
+    expose:
+      - "3100"
+    volumes:
+      - ./docker/loki/loki.yaml:/etc/loki/config.yml:ro
+      - ./data/loki:/loki
+
+  promtail:
+    image: grafana/promtail:3.4.2
+    command:
+      - -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    volumes:
+      - ./docker/promtail/promtail.yaml:/etc/promtail/config.yml:ro
+      - ./data/logs:/var/log/masterclass:ro

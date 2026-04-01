@@ -1,20 +1,67 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+import logging
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
+from secrets import token_urlsafe
 
 import uvicorn
 from fastapi import FastAPI, Request, Response
+from opentelemetry import propagate, trace
 
 from masterclass_mlops.config import Settings, get_settings
 from masterclass_mlops.metrics import PREDICTIONS_TOTAL, metrics_response, record_http_metrics
 from masterclass_mlops.model_logic import classify_document
+from masterclass_mlops.observability import (
+    bind_request_context,
+    configure_logging,
+    configure_tracing,
+    reset_request_context,
+)
 from masterclass_mlops.schemas import (
     HealthResponse,
     ModelPredictionRequest,
     ModelPredictionResponse,
 )
 
-app = FastAPI(title="model-service")
+logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    configure_logging(settings)
+    configure_tracing(app, settings)
+    logger.info("model_service_started")
+    yield
+
+
+app = FastAPI(title="model-service", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def request_context_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    request_id = request.headers.get("X-Request-ID", token_urlsafe(8))
+    tokens = bind_request_context(
+        request_id=request_id,
+        user_id=request.headers.get("X-User-ID"),
+        session_id=request.headers.get("X-Session-ID"),
+    )
+    try:
+        parent_context = propagate.extract(dict(request.headers))
+        with tracer.start_as_current_span(
+            f"{request.method} {request.url.path}",
+            context=parent_context,
+        ):
+            response = await call_next(request)
+    finally:
+        reset_request_context(tokens)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 @app.middleware("http")
@@ -39,16 +86,26 @@ def metrics() -> Response:
 @app.post("/predict", response_model=ModelPredictionResponse)
 def predict(payload: ModelPredictionRequest) -> ModelPredictionResponse:
     settings: Settings = get_settings()
-    label, confidence, processing_time_ms = classify_document(
-        payload.text,
-        delay_seconds=settings.inference_delay_seconds,
-    )
-    PREDICTIONS_TOTAL.labels(service=settings.app_name, label=label).inc()
-    return ModelPredictionResponse(
-        label=label,
-        confidence=confidence,
-        processing_time_ms=processing_time_ms,
-    )
+    with tracer.start_as_current_span("model.inference"):
+        label, confidence, processing_time_ms = classify_document(
+            payload.text,
+            delay_seconds=settings.inference_delay_seconds,
+        )
+        PREDICTIONS_TOTAL.labels(service=settings.app_name, label=label).inc()
+        logger.info(
+            "prediction_completed",
+            extra={
+                "label": label,
+                "confidence": confidence,
+                "input_characters": len(payload.text),
+                "slow_path": processing_time_ms > 150,
+            },
+        )
+        return ModelPredictionResponse(
+            label=label,
+            confidence=confidence,
+            processing_time_ms=processing_time_ms,
+        )
 
 
 def main() -> None:
