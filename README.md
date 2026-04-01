@@ -1,13 +1,21 @@
 # MLOps Architecture Base Branch
 
-This branch contains the base application used in the masterclass. It is the branch used to explain the use case, the service boundaries, and the first security and persistence choices.
+This is the first hands-on branch of the masterclass. The `main` branch defined what we need to build and why. Now we build it.
 
-## What Students Explore
+This branch contains the running application: a small ML system that classifies support messages. The goal here is not to train a model, but to understand **how the application is structured** and **why each service exists**.
 
-- Why the application is split into UI, ingress, gateway, persistence, and model service
-- Where authentication, session validation, and rate limiting live
-- How a request flows through the system
-- Why SQLite is a useful teaching database for a local microservice demo
+## Why Architecture Matters in MLOps
+
+In production, an ML model is never just a model. It needs an API to receive requests, authentication to control access, a database to persist sessions and history, and a reverse proxy to protect the system from overload. If you skip these concerns, you end up with a fragile prototype that breaks the moment real users interact with it.
+
+This branch sets up all those pieces so that in the next branches, you can focus on monitoring and observability without worrying about the foundation.
+
+## What You Will Explore
+
+- How the application is split into distinct services, each with a clear responsibility
+- How a user request travels from the browser through NGINX, the gateway, and the model service
+- Where authentication and session management live, and why those choices matter
+- How to inspect the database to see what the application persists
 
 ## Model Used in This Branch
 
@@ -16,6 +24,14 @@ The current classifier is a deterministic keyword-based model implemented in [sr
 It is not a trained statistical model. This keeps the branch focused on architecture and request flow.
 
 ## Architecture Diagram
+
+Reading from left to right:
+
+1. The learner interacts through a **Streamlit UI** or direct API calls
+2. All requests pass through **NGINX**, which acts as a reverse proxy and applies rate limiting
+3. The **Gateway** handles authentication, sessions, and forwards classification requests to the **Model Service**
+4. The **Model Service** performs the actual text classification
+5. **SQLite** stores users, sessions, and prediction history on a local file that you can inspect directly
 
 ```mermaid
 flowchart LR
@@ -56,7 +72,11 @@ Default demo users:
 
 ## Masterclass Manipulations
 
-### 1. Log in and inspect the session flow
+The manipulations below walk through the main request flow step by step. Each one highlights a different architectural decision and why it exists.
+
+### 1. Log in and observe the session flow
+
+**Why this step matters:** This is the entry point of the application. When a user logs in, the request travels through NGINX, reaches the gateway, which validates the credentials and creates a session token stored in SQLite. Understanding this flow is essential because it shows where security boundaries live.
 
 ```bash
 curl -i -s http://localhost:8080/auth/login \
@@ -64,13 +84,17 @@ curl -i -s http://localhost:8080/auth/login \
   -d '{"username":"alice","password":"mlops-demo"}'
 ```
 
-What to discuss:
+**What to observe:**
 
-- the request enters through NGINX
-- the gateway validates credentials
-- a session token is created and stored in SQLite
+- The response contains an `access_token` that the client must send with every future request
+- The token was created by the gateway, not by the UI or the model service
+- A session was persisted in SQLite, so it survives a service restart
 
-### 2. Classify a document through the gateway
+**Key takeaway:** The gateway owns authentication. No other service needs to know how passwords are validated.
+
+### 2. Classify a document through the full request path
+
+**Why this step matters:** This is the core business flow. The user sends a text, the gateway validates the session, forwards the text to the model service, stores the result in history, and returns everything to the client. This shows why the gateway is the orchestrator: it connects authentication, inference, and persistence without exposing any of them directly.
 
 ```bash
 TOKEN="$(curl -s http://localhost:8080/auth/login \
@@ -84,13 +108,17 @@ curl -i -s http://localhost:8080/api/classify \
   -d '{"text":"My profile login does not work after the password reset."}'
 ```
 
-What to discuss:
+**What to observe:**
 
-- why the UI never talks directly to the model service
-- why the gateway owns auth and routing
-- how recent prediction history is tied to the session
+- The response includes a predicted label, a confidence score, and recent prediction history for this session
+- The UI never talks to the model service directly: the gateway handles everything
+- Prediction history is tied to the session, so each user has their own context
 
-### 3. Reproduce an unauthenticated failure
+**Key takeaway:** Separating the gateway from the model service means you can change, scale, or replace the model without touching authentication or routing logic.
+
+### 3. Try to classify without authentication
+
+**Why this step matters:** This step sends a classification request without a token. The gateway rejects it immediately. The model service never sees the request. This is the security boundary in action: the gateway protects downstream services from unauthorized access.
 
 ```bash
 curl -i -s http://localhost:8080/api/classify \
@@ -98,12 +126,16 @@ curl -i -s http://localhost:8080/api/classify \
   -d '{"text":"My payment failed and I need help."}'
 ```
 
-What to discuss:
+**What to observe:**
 
-- why the request is rejected
-- why the gateway is the right boundary for this control
+- The response is a `401 Unauthorized` or `403 Forbidden`
+- The model service logs show nothing for this request: it was stopped at the gateway
 
-### 4. Inspect the SQLite file used by the application
+**Key takeaway:** The gateway is the right place for access control. If every service had to check authentication independently, the system would be harder to secure and maintain.
+
+### 4. Inspect the database directly
+
+**Why this step matters:** One advantage of SQLite for a workshop is that you can open the database file and look at what the application persisted. This makes the state visible and debuggable, which is harder with a remote database.
 
 ```bash
 ls -lh data/
@@ -112,11 +144,13 @@ sqlite3 data/masterclass.db 'select username from users;'
 sqlite3 data/masterclass.db 'select id, user_id, expires_at from sessions;'
 ```
 
-Use this to show students:
+**What to observe:**
 
-- persisted users
-- persisted sessions
-- why SQLite is easy to inspect during a workshop
+- The `users` table contains the demo accounts
+- The `sessions` table shows active sessions with expiration timestamps
+- Everything the application stores is inspectable from the host machine
+
+**Key takeaway:** In a local development or workshop setup, being able to inspect state directly accelerates understanding and debugging.
 
 ## Useful Commands
 
