@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import cast
-from urllib.parse import urlencode
 
 import requests
 
@@ -9,6 +8,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from shared.config import get_settings
 from shared.schemas import ClassifyResponse, LoginResponse
+from ui.streamlit.grafana import MONITORING_DASHBOARD_UID, build_dashboard_url
 
 ADMIN_USERNAME = "admin"
 
@@ -42,25 +42,11 @@ def logout(api_url: str, token: str) -> None:
     ).raise_for_status()
 
 
-def build_dashboard_url(base_url: str, dashboard_uid: str, from_range: str = "now-30m") -> str:
-    query = urlencode(
-        {
-            "orgId": 1,
-            "from": from_range,
-            "to": "now",
-            "theme": "light",
-            "kiosk": "",
-            "refresh": "5s",
-        }
-    )
-    return f"{base_url}/d/{dashboard_uid}/{dashboard_uid}?{query}"
-
-
 def render_monitoring_cockpit(grafana_url: str) -> None:
     st.subheader("Monitoring Cockpit")
     st.caption("Golden signals are embedded directly from Grafana for the admin walkthrough.")
     components.iframe(
-        build_dashboard_url(grafana_url, "api-golden-signals"),
+        build_dashboard_url(grafana_url, MONITORING_DASHBOARD_UID),
         height=1400,
         scrolling=True,
     )
