@@ -1,44 +1,33 @@
-# Monitoring and Observability for MLOps Masterclass
+# Monitoring and Observability for MLOps
 
-This repository supports a 2-hour, beginner-friendly masterclass about monitoring and observability in an MLOps-oriented microservice system.
+This repository supports a hands-on masterclass about architecture, monitoring, and observability in a small ML-oriented microservice system.
 
-The learning path is split across cumulative branches:
+Use `main` as the entrypoint for the workshop structure, then move branch by branch to reproduce the progressive build-up of the platform.
 
-- `main`: course framing, branch map, and teaching notes
-- `01-architecture-base`: a simple document-classification system with security, sessions, SQLite persistence, and Docker packaging
-- `02-monitoring-prometheus-grafana`: Prometheus and Grafana dashboards focused on API golden signals
-- `03-observability-otel`: OpenTelemetry, logs, traces, and root-cause analysis workflows
+## Branch Path
 
-## Learning Goals
+- `01-architecture-base`: core application, security boundaries, sessions, and SQLite persistence
+- `02-monitoring-prometheus-grafana`: Prometheus and Grafana dashboards for API golden signals
+- `03-observability-otel`: logs, traces, correlation, and root-cause analysis
 
-- Understand why a simple ML application benefits from a microservice architecture
-- Identify where security, sessions, and persistence belong in the stack
-- Monitor API health with golden-signal dashboards
-- Move from symptom detection to root-cause analysis with logs and traces
+## What Students Learn Across the Repository
 
-## Use Case
+- How to decompose a simple ML application into explicit services
+- How to monitor APIs with a small set of useful signals
+- How to move from symptom detection to investigation
+- How to reproduce behaviors locally with commands instead of slides alone
 
-The application classifies short support-style messages into one of three categories:
+## Model Used Across the Workshop
 
-- `billing`
-- `technical`
-- `account`
+The repository currently uses a deterministic keyword-based classifier implemented in [src/masterclass_mlops/model_logic.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/masterclass_mlops/model_logic.py) on the runnable branches.
 
-The model is intentionally lightweight so the session can focus on architecture, monitoring, and debugging rather than model training.
+It is not a trained statistical model. This is intentional:
 
-## Audience
+- the service behavior stays deterministic
+- branch diffs stay easy to read
+- students focus on architecture, monitoring, and observability
 
-The workshop is designed for learners who already know the basics of:
-
-- Linux and Bash
-- Docker and Docker Compose
-- HTTP APIs
-
-## Branch Progression
-
-1. Start on `01-architecture-base` to explain the use case, requirements, and service boundaries.
-2. Move to `02-monitoring-prometheus-grafana` to answer: "What is happening in the system?"
-3. Move to `03-observability-otel` to answer: "Why is it happening?"
+If you later want a trained model, this repository already gives you the right service boundaries to swap the inference logic without redesigning the system.
 
 ## Target Architecture
 
@@ -46,6 +35,8 @@ The workshop is designed for learners who already know the basics of:
 flowchart LR
     User["Learner Browser"] --> UI["Streamlit UI"]
     UI --> NGINX["NGINX Reverse Proxy<br/>Rate Limiting"]
+    UI --> API["HTTP API Calls"]
+    API --> NGINX
     NGINX --> Gateway["FastAPI Gateway<br/>Auth and Session Validation"]
     Gateway --> SQLite[("SQLite<br/>users, sessions, history")]
     Gateway --> Model["FastAPI Model Service<br/>Document Classification"]
@@ -69,10 +60,36 @@ flowchart LR
     NGINX -. Access logs .-> Promtail
 ```
 
-## Teaching Notes
+## Recommended Workshop Flow
 
-- Keep the live session focused on a small number of components and dashboards.
-- Use branch diffs to make each new concern visible and deliberate.
-- Prefer guided exploration and prepared demo scenarios over long live-coding segments.
+1. Read this branch and the outline in [docs/masterclass-outline.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/masterclass-outline.md).
+2. Switch to `01-architecture-base` and run the base stack.
+3. Switch to `02-monitoring-prometheus-grafana` and reproduce the monitoring exercises.
+4. Switch to `03-observability-otel` and reproduce the investigation exercises.
 
-Additional session notes live in [docs/masterclass-outline.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/masterclass-outline.md).
+## Commands to Move Through the Masterclass
+
+```bash
+git checkout 01-architecture-base
+make install
+make test
+make up
+
+git checkout 02-monitoring-prometheus-grafana
+make test
+make up
+
+git checkout 03-observability-otel
+make test
+make up
+```
+
+Common cleanup command:
+
+```bash
+docker compose down --remove-orphans
+```
+
+## Supporting Notes
+
+- Workshop outline: [docs/masterclass-outline.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/masterclass-outline.md)
