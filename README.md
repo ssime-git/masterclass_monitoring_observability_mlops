@@ -1,13 +1,24 @@
 # MLOps Monitoring Masterclass Branch
 
-This branch adds monitoring to the base application. It is the branch used to answer the question: `What is happening in the system?`
+This branch adds monitoring to the base application. In the previous branch, you built and explored the architecture. Now the question becomes: **what is happening in the system?**
 
-## What Students Explore
+## Why Monitoring Matters
 
-- How to instrument APIs with Prometheus-compatible metrics
-- How to monitor traffic, errors, latency, and saturation
-- How to keep a dashboard readable and focused on useful signals
-- Why metrics are strong for symptoms and weak for root-cause analysis
+When you deploy an ML application, the code works, the model predicts, users interact with it. But how do you know things are going well? How do you notice if latency starts creeping up, if errors spike, or if traffic suddenly drops?
+
+That is what monitoring answers. It gives you a continuous, real-time view of the system's health through **metrics**: numbers that describe what the system is doing right now.
+
+In this branch, we add **Prometheus** and **Grafana** to the architecture:
+
+- **Prometheus** collects metrics from each service at regular intervals (this is called scraping)
+- **Grafana** turns those metrics into visual dashboards where you can spot trends, spikes, and anomalies at a glance
+
+## What You Will Explore
+
+- How to read a monitoring dashboard organized around four key signals: **traffic**, **errors**, **latency**, and **saturation**
+- How to distinguish between a healthy system and a degraded one, even when all requests return `200`
+- How to see the difference between a failure inside the application (wrong password) and a failure at the edge (rate limiting)
+- Why monitoring is essential but not sufficient: it tells you **what** changed, but not **why**
 
 ## Model Used in This Branch
 
@@ -16,6 +27,8 @@ The current classifier is a deterministic keyword-based model implemented in [sr
 It is not a trained statistical model. This keeps the workshop focused on service behavior and monitoring instead of training pipelines.
 
 ## Architecture Diagram
+
+Compared to the architecture branch, the new additions are at the bottom: **Prometheus** scrapes metrics from the gateway, model service, and NGINX, and **Grafana** displays them as dashboards.
 
 ```mermaid
 flowchart LR
@@ -68,13 +81,16 @@ If you log in through Streamlit with `admin / mlops-demo`, the UI exposes an emb
 
 ## Readiness Check
 
-Run this once after `make up` so the first demo does not mix startup noise with the teaching flow.
-
-Shortcut:
+After starting the stack, run this command to make sure everything is up and ready:
 
 ```bash
 make demo-ready
 ```
+
+This checks that the application, Prometheus, and Grafana are all responding. If everything is green, you are ready to start the manipulations.
+
+<details>
+<summary>Underlying commands and expected output</summary>
 
 ```bash
 for url in \
@@ -88,8 +104,6 @@ do
 done
 ```
 
-Example output:
-
 ```text
 == http://localhost:8080/health ==
 {"status":"ok"}
@@ -102,25 +116,31 @@ Prometheus Server is Ready.
 }
 ```
 
-What to comment live:
-
-- The application is reachable through NGINX before any user traffic is generated.
-- Prometheus and Grafana are both ready, so dashboard observations should be trustworthy.
+</details>
 
 ## Masterclass Manipulations
 
-### 1. Create baseline traffic
+The manipulations follow a progressive storyline. You start by generating healthy traffic, then introduce failures at different layers, and finally look under the hood at how metrics are collected.
 
-Goal:
-Show one healthy login and one healthy classification before opening Grafana.
+### 1. Generate healthy traffic and observe the dashboard
 
-Shortcut:
+**Why this step matters:** Before looking for problems, you need to see what a healthy system looks like on a dashboard. This step creates one login and one classification, which is enough for Grafana to show activity on all the key panels.
 
 ```bash
 make demo-baseline
 ```
 
-Underlying commands:
+**What to observe in Grafana:**
+
+- **Traffic** panels show that the gateway and model service each handled requests
+- **Error rate** stays flat (no errors yet)
+- **Latency** panels show very low response times
+- **Prediction distribution** shows one `billing` prediction
+
+**Key takeaway:** This is your baseline. When something goes wrong later, you will compare it to this healthy state. Monitoring is most useful when you already know what "normal" looks like.
+
+<details>
+<summary>Underlying commands and example output</summary>
 
 ```bash
 LOGIN="$(curl -i -s http://localhost:8080/auth/login \
@@ -140,8 +160,6 @@ curl -i -s http://localhost:8080/api/classify \
   -d '{"text":"My payment failed and I need a refund for my subscription."}'
 ```
 
-Example output:
-
 ```text
 HTTP/1.1 200 OK
 Server: nginx/1.27.5
@@ -156,42 +174,34 @@ Content-Type: application/json
 {"result":{"label":"billing","confidence":0.8500000000000001,"processing_time_ms":0.029625000024680048},"history":[{"text":"My payment failed and I need a refund for my subscription.","predicted_label":"billing","confidence":0.8500000000000001,"created_at":"2026-04-01T18:53:06.422567"}]}
 ```
 
-What changed operationally:
+</details>
 
-- The gateway handled one successful login and one successful classify request.
-- The model service produced one `billing` prediction.
-- Prometheus now has healthy traffic to scrape and Grafana has something visible to plot.
+### 2. Trigger an authentication failure
 
-How to explain it live:
+**Why this step matters:** This step generates an error that comes from the application itself, not from the model. A user tries to log in with the wrong password. The gateway rejects the request with a `401`, and the model service is never involved.
 
-- Start with the business view: a user logged in and classified one support ticket.
-- Translate that into monitoring language: request rate increased, error rate stayed flat, prediction count rose for `billing`.
-
-Common learner confusion:
-
-- Learners often expect the UI to call the model directly. Point out that the gateway owns authentication and orchestration.
-- Learners may focus on the tiny latency value only. Remind them that one request is not a trend; metrics matter over time.
-
-### 2. Reproduce an authentication failure
-
-Goal:
-Generate a clean application-side error without involving the model service.
-
-Shortcut:
+On the dashboard, you will see the **error rate** go up on the authentication route, but the model service stays untouched. This teaches a fundamental monitoring skill: reading the dashboard to understand **where** in the system a failure is happening.
 
 ```bash
 make demo-auth-failure
 ```
 
-Underlying command:
+**What to observe in Grafana:**
+
+- The error counter increases on `/auth/login`
+- The model service panels are unchanged
+- The failure is clearly isolated to the gateway authentication layer
+
+**Key takeaway:** Not all errors are the same. Monitoring helps you separate problems at different layers: is it the edge? the gateway? the model? Knowing where to look saves time.
+
+<details>
+<summary>Underlying commands and example output</summary>
 
 ```bash
 curl -i -s http://localhost:8080/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"alice","password":"wrong-password"}'
 ```
-
-Example output:
 
 ```text
 HTTP/1.1 401 Unauthorized
@@ -201,32 +211,28 @@ Content-Type: application/json
 {"detail":"Invalid credentials"}
 ```
 
-What changed operationally:
+</details>
 
-- Gateway error traffic increased on `/auth/login`.
-- The model service did not participate in this failure.
+### 3. Reproduce ingress pressure with a burst of requests
 
-How to explain it live:
+**Why this step matters:** This time the problem is not in the application at all. We send 12 requests in quick succession, and NGINX rate limiting kicks in. The first few succeed, the rest are rejected with `503` before they ever reach the gateway.
 
-- This is a useful monitoring contrast: traffic exists, but the failure is clearly attached to authentication.
-- Students should learn to separate “edge failure”, “gateway failure”, and “model failure”.
-
-Common learner confusion:
-
-- `401` here is not a Prometheus or Grafana issue. It is correct application behavior.
-
-### 3. Reproduce ingress pressure
-
-Goal:
-Show how the public edge reacts to a burst of requests before the application itself becomes the main story.
-
-Shortcut:
+This is a completely different pattern from the authentication failure. On the dashboard, you will see a traffic spike and errors, but the application-level metrics will not fully reflect the burst because most requests were blocked at the edge.
 
 ```bash
 make demo-burst
 ```
 
-Underlying command:
+**What to observe in Grafana:**
+
+- NGINX active connections spike
+- Some requests succeed, then `503` errors appear
+- The gateway did not see all 12 requests because NGINX blocked most of them
+
+**Key takeaway:** Monitoring covers multiple layers. Some problems happen before requests reach your application. If you only look at application metrics, you will miss edge-level failures entirely.
+
+<details>
+<summary>Underlying commands and example output</summary>
 
 ```bash
 for _ in $(seq 1 12); do
@@ -235,8 +241,6 @@ for _ in $(seq 1 12); do
     -d '{"username":"alice","password":"mlops-demo"}'
 done
 ```
-
-Example output:
 
 ```text
 200
@@ -253,34 +257,27 @@ Example output:
 503
 ```
 
-What changed operationally:
+The exact number of initial `200` responses depends on traffic already sent in the current rate-limit window.
 
-- Traffic spiked at the ingress.
-- In the current stack, NGINX rate limiting surfaces as `503` in the verified demo output.
-- Gateway traffic stops reflecting the full burst because some requests are blocked before they reach the application.
-- The exact cutover point between `200` and `503` depends on how much traffic was already sent in the current rate-limit window.
+</details>
 
-How to explain it live:
+### 4. Look under the hood: how metrics are collected
 
-- This is the moment to discuss edge protection and back-pressure.
-- The important lesson is not the exact status code. The important lesson is that the edge can absorb or reject pressure before the services do.
+**Why this step matters:** So far you have looked at Grafana dashboards. But where does the data come from? This step shows you the raw metrics pipeline: each service exposes a `/metrics` endpoint internally, Prometheus scrapes it regularly, and Grafana queries Prometheus.
 
-Common learner confusion:
-
-- Older explanations often expect `429`. In this branch, the verified terminal behavior is `503`, so the documentation follows the real stack.
-
-### 4. Inspect raw monitoring evidence
-
-Goal:
-Show students where Grafana gets its data and how to inspect the metrics path without using the dashboard first.
-
-Shortcut:
+Understanding this pipeline helps you debug situations where a dashboard looks empty or wrong: is the service exposing metrics? Is Prometheus scraping them? Is the query correct?
 
 ```bash
 make demo-targets
 ```
 
-Underlying commands:
+**What to observe:**
+
+- Prometheus shows three active scrape targets: gateway, model-service, and NGINX exporter
+- You can query raw metric values directly from Prometheus and see the same numbers that Grafana displays
+
+<details>
+<summary>Underlying commands and example output</summary>
 
 ```bash
 curl -i -s http://localhost:8080/metrics
@@ -301,16 +298,10 @@ for item in payload["data"]["result"][:8]:
 '
 ```
 
-Example output:
-
 ```text
 HTTP/1.1 404 Not Found
 Server: nginx/1.27.5
 Content-Type: text/html
-
-<html>
-<head><title>404 Not Found</title></head>
-...
 
 gateway up http://gateway:8000/metrics
 model-service up http://model-service:8001/metrics
@@ -322,19 +313,26 @@ nginx up http://nginx-exporter:9113/metrics
 {'__name__': 'masterclass_http_requests_total', 'instance': 'model-service:8001', 'job': 'model-service', 'method': 'POST', 'path': '/predict', 'service': 'model-service', 'status': '200'} 1
 ```
 
-What changed operationally:
+Note: the `404` on `http://localhost:8080/metrics` is expected. The public NGINX route does not expose the metrics endpoint. Prometheus scrapes metrics directly from the internal service addresses.
 
-- Nothing new happened to the application. This step inspects what was already collected.
-- The current NGINX public surface does not expose `/metrics`, so Prometheus is the reliable raw entrypoint.
+</details>
 
-How to explain it live:
+## What Monitoring Can and Cannot Do
 
-- Metrics usually exist on internal scrape paths, not necessarily on the public API.
-- Prometheus is the source of truth for “what was scraped” and “which targets are healthy”.
+Monitoring answers:
 
-Common learner confusion:
+- **Is traffic reaching the system?**
+- **Are errors increasing?**
+- **Is latency rising?**
+- **Is the system under pressure?**
 
-- A `404` on `http://localhost:8080/metrics` does not mean monitoring is broken. It means that this public route is not wired to the gateway metrics endpoint in the current stack.
+Monitoring does not answer:
+
+- Which specific request caused the problem?
+- What context did that request carry?
+- Where exactly was time spent inside the request?
+
+Those deeper questions require **observability** (logs and traces), which is the subject of the next branch.
 
 ## Useful Commands
 
