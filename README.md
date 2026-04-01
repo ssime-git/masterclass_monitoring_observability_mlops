@@ -1,13 +1,27 @@
 # MLOps Monitoring and Observability Masterclass
 
-This branch is the final state of the workshop. It includes the base application, the monitoring stack, and the observability stack used to investigate root causes.
+This branch is the final state of the workshop. It includes the base application, the monitoring stack, and the observability stack.
 
-## What Students Explore
+## Monitoring vs Observability: Why Both?
 
-- How a small ML-oriented system is split into UI, ingress, gateway, persistence, and model service
-- How Prometheus and Grafana answer `what is happening?`
-- How logs and traces answer `why is it happening?`
-- How to reproduce slow requests, authentication flows, and ingress-level failures
+In the monitoring branch, we have already set up Prometheus and Grafana. They answer a question simple but essential: **what is happening in the system right now?** Traffic goes up, latency increases, errors appear. Metrics give you the big picture.
+
+But when something goes wrong, knowing that latency went up is not enough. You need to understand **why**. Which specific request was slow? What path did it take through the services? What context did it carry? That is the question that observability answers.
+
+In this branch, we add **logs** and **traces** on top of the existing metrics:
+
+- **Logs** record what each service did during a request, with enough context to find a specific event across services
+- **Traces** show the timing and structure of a request as it crosses multiple services, making it possible to see where time was spent
+
+Together, metrics, logs, and traces form the three pillars of observability. Metrics tell you that something changed. Logs and traces tell you what happened and where to look.
+
+## What You Will Explore
+
+- How monitoring (Prometheus and Grafana) answers **"what is happening?"**
+- How observability (logs and traces) answers **"why is it happening?"**
+- How to follow a single request across multiple services using shared identifiers
+- How to distinguish a slow application response from a request blocked at the entry point
+- How these tools work together to move from a symptom to a root cause
 
 ## Model Used in This Branch
 
@@ -15,11 +29,19 @@ The current classifier is a deterministic keyword-based model implemented in [sr
 
 It is not a trained statistical model. That is intentional for this masterclass:
 
-- the architecture remains the focus
-- predictions stay deterministic during demos
-- students can inspect the full inference logic quickly
+- the architecture remains the focus, not the model itself
+- predictions stay deterministic so the demos are reproducible
+- the full inference logic is easy to inspect
 
 ## Architecture Diagram
+
+The diagram below shows the full system. Reading it from left to right:
+
+1. The learner interacts through a **Streamlit UI** or direct API calls
+2. All requests pass through **NGINX**, which acts as a reverse proxy and applies rate limiting
+3. The **Gateway** handles authentication, sessions, and forwards classification requests to the **Model Service**
+4. On the monitoring side, **Prometheus** collects metrics from each service, and **Grafana** displays them as dashboards
+5. On the observability side, services send **traces** through OpenTelemetry to **Tempo**, and **structured logs** through Promtail to **Loki**. Grafana brings everything together: metrics, logs, and traces in one place.
 
 ```mermaid
 flowchart LR
@@ -86,13 +108,16 @@ If you log in through Streamlit with `admin / mlops-demo`, the UI exposes:
 
 ## Readiness Check
 
-Run this once after `make up` so the first trace and log investigation starts from a clean state.
-
-Shortcut:
+After starting the stack, run this command to make sure everything is up and ready before starting the demo:
 
 ```bash
 make demo-ready
 ```
+
+This checks that the application, Prometheus, and Grafana are all responding. If everything is green, you are ready to start the manipulations.
+
+<details>
+<summary>Underlying commands and expected output</summary>
 
 ```bash
 for url in \
@@ -106,8 +131,6 @@ do
 done
 ```
 
-Example output:
-
 ```text
 == http://localhost:8080/health ==
 {"status":"ok"}
@@ -120,26 +143,31 @@ Prometheus Server is Ready.
 }
 ```
 
-What to comment live:
-
-- The public entrypoint is ready.
-- Monitoring is ready.
-- Observability backends are ready behind Grafana.
+</details>
 
 ## Masterclass Manipulations
 
-### 1. Start with a fast request
+The manipulations below follow a progressive storyline. Each step builds on the previous one to show how monitoring and observability complement each other when investigating a production system.
 
-Goal:
-Capture a healthy request with a visible `x-request-id` and a very short processing time.
+### 1. Establish a healthy baseline
 
-Shortcut:
+**Why this step matters:** Before investigating problems, you need to know what "normal" looks like. This first request is fast and successful. It gives you a reference point to compare against later.
 
 ```bash
 make demo-fast
 ```
 
-Underlying commands:
+This logs in as a demo user and sends a short text to the classification endpoint.
+
+**What to observe in the response:**
+
+- The response comes back with status `200` and a very short processing time (around `0.05 ms`)
+- The response header contains an `x-request-id`. This identifier is the first tool observability gives you: a way to find this specific request later in logs and traces
+
+**Key takeaway:** Everything looks fine. The system is healthy. Remember this baseline for the next step.
+
+<details>
+<summary>Underlying commands and example output</summary>
 
 ```bash
 LOGIN="$(curl -i -s http://localhost:8080/auth/login \
@@ -157,8 +185,6 @@ curl -i -s http://localhost:8080/api/classify \
   -d '{"text":"Refund please."}'
 ```
 
-Example output:
-
 ```text
 HTTP/1.1 200 OK
 Server: nginx/1.27.5
@@ -168,34 +194,30 @@ x-request-id: ztWg3aTI4AA
 {"result":{"label":"billing","confidence":0.65,"processing_time_ms":0.05241700000624405},"history":[{"text":"Refund please.","predicted_label":"billing","confidence":0.65,"created_at":"2026-04-01T18:54:37.321445"}]}
 ```
 
-What changed operationally:
+</details>
 
-- Gateway and model-service each processed one request for the same business action.
-- A request identifier is now available to pivot into logs.
-- The model stayed on the fast path because the text was short and did not trigger extra delay.
+### 2. Trigger a slow request and notice the difference
 
-How to explain it live:
+**Why this step matters:** This is the core teaching moment. We send a longer text that triggers a slower code path in the model. The response is still `200 OK`, the prediction is still correct, but it took **7000 times longer**. Without monitoring, nobody would notice. The user got an answer, but the experience was degraded.
 
-- Start from the user response and show that observability begins with something concrete: a request identifier and a latency.
-- This is the “known good” comparison point for the next slower request.
+This is where **monitoring** starts to shine: the Grafana dashboard will show a latency spike on the classify endpoint. You can see that something changed.
 
-Common learner confusion:
-
-- `x-request-id` is not the same thing as `trace_id`.
-- The response already gives one correlation handle before opening Grafana.
-
-### 2. Reproduce a slower request
-
-Goal:
-Use a request that triggers the model slow path and compare it to the fast request.
-
-Shortcut:
+But monitoring alone only tells you **that** latency went up. It does not tell you **which** request caused it, or **why** it was slow. That is where observability picks up.
 
 ```bash
 make demo-slow
 ```
 
-Underlying commands:
+**What to observe:**
+
+- The response is still `200`, but `processing_time_ms` jumped from `0.05 ms` to roughly `353 ms`
+- In Grafana, the latency panel shows a clear spike compared to the previous request
+- A successful response does not always mean the system is healthy
+
+**Key takeaway:** Monitoring detected the symptom (latency spike). Now we need observability to find the cause.
+
+<details>
+<summary>Underlying commands and example output</summary>
 
 ```bash
 LOGIN="$(curl -i -s http://localhost:8080/auth/login \
@@ -213,8 +235,6 @@ curl -i -s http://localhost:8080/api/classify \
   -d '{"text":"My account login has latency issues after the password reset."}'
 ```
 
-Example output:
-
 ```text
 HTTP/1.1 200 OK
 Server: nginx/1.27.5
@@ -224,32 +244,29 @@ x-request-id: 1r59MPi1pEQ
 {"result":{"label":"account","confidence":0.8500000000000001,"processing_time_ms":353.25243300030706},"history":[{"text":"My account login has latency issues after the password reset.","predicted_label":"account","confidence":0.8500000000000001,"created_at":"2026-04-01T18:54:37.681423"}]}
 ```
 
-What changed operationally:
+</details>
 
-- The response is still successful, but latency jumped from roughly `0.05 ms` to roughly `353 ms`.
-- The same application flow now leaves richer evidence in logs and traces because it is long enough to investigate.
+### 3. Follow the slow request across services using logs
 
-How to explain it live:
+**Why this step matters:** This is the step where observability proves its value. Using the `x-request-id` from the slow response, we search the logs of both services. Because each service writes structured logs with shared identifiers (`request_id`, `session_id`, `trace_id`), we can follow the exact journey of that one slow request across the gateway and the model service.
 
-- This is the core observability teaching moment: the symptom is visible in the response itself, then metrics show the slowdown, then logs and traces explain it.
-- Students should notice that “success” and “healthy” are not always the same thing.
-
-Common learner confusion:
-
-- A `200` response can still represent a degraded user experience.
-
-### 3. Correlate the slower request in logs
-
-Goal:
-Show the same application request across gateway and model-service logs, then show the current correlation limit at the ingress.
-
-Shortcut:
+This is something monitoring alone cannot do. Metrics tell you "latency went up on the classify route." Logs tell you "this specific request, sent by this user, in this session, triggered the slow path in the model."
 
 ```bash
 make demo-correlate
 ```
 
-Underlying commands:
+**What to observe:**
+
+- The same `request_id` appears in both the gateway logs and the model-service logs
+- The logs also share a `trace_id`, which links to the distributed trace in Tempo
+- The model-service log shows `"slow_path": true`, which explains why this request was slow
+- NGINX also logged the request, but with a different `request_id` (the ingress and application layers do not yet share identifiers end to end)
+
+**Key takeaway:** Structured logs with shared identifiers let you reconstruct the full story of a single request across multiple services. That is the difference between knowing "something is slow" (monitoring) and knowing "this request was slow because it hit the model slow path" (observability).
+
+<details>
+<summary>Underlying commands and example output</summary>
 
 ```bash
 REQUEST_ID="1r59MPi1pEQ"
@@ -259,8 +276,6 @@ rg -n "$REQUEST_ID" data/logs/gateway.log data/logs/model-service.log
 tail -n 6 data/logs/nginx/access.log
 ```
 
-Example output:
-
 ```text
 data/logs/model-service.log:7:{"timestamp":"2026-04-01T18:54:37.671663+00:00","message":"prediction_completed","service":"model-service","request_id":"1r59MPi1pEQ","session_id":"9","trace_id":"307026916f251c54ece9bec9c8328dad","slow_path":true}
 data/logs/gateway.log:33:{"timestamp":"2026-04-01T18:54:37.677076+00:00","message":"HTTP Request: POST http://model-service:8001/predict \"HTTP/1.1 200 OK\"","service":"gateway","request_id":"1r59MPi1pEQ","session_id":"9","trace_id":"307026916f251c54ece9bec9c8328dad"}
@@ -269,33 +284,30 @@ data/logs/gateway.log:35:{"timestamp":"2026-04-01T18:54:37.691591+00:00","messag
 {"timestamp":"2026-04-01T18:54:37+00:00","service":"nginx","request_method":"POST","request_uri":"/api/classify","status":200,"request_time":0.408,"request_id":"d34cb267b41c7601651927f0b8ba59d4"}
 ```
 
-What changed operationally:
+Note: `make demo-slow` stores the latest request id in `data/logs/demo-last-request-id.txt`, and `make demo-correlate` reuses it automatically.
 
-- Gateway and model-service share the same application `request_id`, `session_id`, and `trace_id`.
-- NGINX logs the request too, but with its own ingress-generated `request_id`.
-- `make demo-slow` stores the latest application request id in `data/logs/demo-last-request-id.txt`, and `make demo-correlate` reuses it by default.
+</details>
 
-How to explain it live:
+### 4. Observe a different kind of failure: ingress pressure
 
-- This is enough to follow the request across the application tier.
-- It is also a good place to be honest about the current limit: ingress and application identifiers are not yet unified end to end.
+**Why this step matters:** Not all problems come from the application. Sometimes requests never even reach your services because they are blocked at the entry point. This step sends a burst of requests that triggers NGINX rate limiting. The first few succeed, but the rest are rejected with `503`.
 
-Common learner confusion:
-
-- Learners often assume every `request_id` in the stack must be identical. In this branch, that is true inside the application tier, not across NGINX.
-
-### 4. Reproduce ingress pressure
-
-Goal:
-Contrast an application slowdown with an ingress rejection.
-
-Shortcut:
+This is a completely different investigation pattern compared to the slow request. The application logs will be empty for the rejected requests because the application never saw them. Only the NGINX (ingress) logs show what happened.
 
 ```bash
 make demo-burst
 ```
 
-Underlying command:
+**What to observe:**
+
+- The first requests return `200`, then the rest return `503`
+- In the Grafana monitoring dashboard, you can see the traffic spike and the error rate going up
+- In the application logs, there is no trace of the rejected requests because they were stopped at NGINX before reaching the gateway
+
+**Key takeaway:** Monitoring and observability work at different layers. A slow model response and a rate-limited burst are two completely different problems, and you need different tools to investigate each one. Knowing where to look is as important as having the tools.
+
+<details>
+<summary>Underlying commands and example output</summary>
 
 ```bash
 for _ in $(seq 1 12); do
@@ -305,8 +317,6 @@ for _ in $(seq 1 12); do
 done
 ```
 
-Example output:
-
 ```text
 200
 200
@@ -322,34 +332,25 @@ Example output:
 503
 ```
 
-What changed operationally:
+The exact number of initial `200` responses depends on traffic already sent in the current rate-limit window.
 
-- The ingress is now the main actor.
-- In the verified local stack, rate limiting shows up as `503`.
-- This failure pattern is different from the slower but successful classify request.
-- The exact number of initial `200` responses depends on traffic already sent in the current rate-limit window.
+</details>
 
-How to explain it live:
+### 5. Verify the monitoring and observability backends
 
-- A slow request and a blocked request are different operational stories.
-- Metrics, logs, and traces help separate “application is slow” from “edge rejected the call”.
-
-Common learner confusion:
-
-- Students often expect the application logs to explain every failure. For ingress rejections, the edge logs matter first.
-
-### 5. Verify monitoring and observability backends
-
-Goal:
-Show that the dashboards and collectors behind the demo are really present.
-
-Shortcut:
+**Why this step matters:** This step confirms that all the infrastructure behind the demos is actually running and collecting data. It is a good way to close the loop and show that everything connects together.
 
 ```bash
 make demo-backends
 ```
 
-Underlying commands:
+**What to observe:**
+
+- Prometheus is actively scraping metrics from the gateway, model-service, and NGINX
+- Grafana has both a monitoring dashboard (API Golden Signals) and an observability dashboard (Observability Overview) provisioned and ready to use
+
+<details>
+<summary>Underlying commands and example output</summary>
 
 ```bash
 curl -s http://localhost:9090/api/v1/targets | python3 -c '
@@ -366,8 +367,6 @@ for item in json.load(sys.stdin):
 '
 ```
 
-Example output:
-
 ```text
 gateway up http://gateway:8000/metrics
 model-service up http://model-service:8001/metrics
@@ -378,10 +377,20 @@ API Golden Signals api-golden-signals dash-db
 Observability Overview observability-overview dash-db
 ```
 
-What to comment live:
+</details>
 
-- Prometheus scrapes the application and ingress metrics.
-- Grafana has both the monitoring dashboard and the observability dashboard provisioned.
+## Summary: What Observability Adds Beyond Monitoring
+
+| Question | Monitoring (metrics) | Observability (logs + traces) |
+| --- | --- | --- |
+| Is something wrong? | Latency spike on the dashboard | - |
+| Which request caused it? | - | Search by `request_id` in logs |
+| What path did the request take? | - | Follow the `trace_id` across services |
+| Why was it slow? | - | Log shows `slow_path: true` |
+| Where was time spent? | - | Trace shows timing per service |
+| Was the failure in the app or at the edge? | Error rate went up | Logs show if the app or NGINX handled it |
+
+Monitoring tells you something is happening. Observability tells you why it is happening and where to look. In production MLOps, you need both.
 
 ## Useful Commands
 
