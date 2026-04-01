@@ -1,55 +1,74 @@
-# Masterclass Outline
+# Application Exploration Path
 
-## Schedule
+## Purpose of the Repository
 
-1. `15 min`: use case, requirements, and architecture rationale
-2. `35 min`: branch `01-architecture-base`
-3. `30 min`: branch `02-monitoring-prometheus-grafana`
-4. `30 min`: branch `03-observability-otel`
-5. `10 min`: final recap
+This repository follows the same application through three stages:
 
-## Functional Requirements
+1. a working microservice architecture
+2. a monitoring layer based on metrics
+3. an observability layer based on logs and traces
 
-- Users can log in and keep an authenticated session
-- Users can classify a text document through a UI
-- The system supports multiple simultaneous users
-- Requests are rate-limited at the ingress layer
+The application remains the same across branches. What changes is the amount of operational visibility available to investigate it.
 
-## Non-Functional Requirements
+## Core Application Requirements
 
-- The system runs locally with Docker Compose
-- The architecture must remain explainable to beginners
-- The stack must expose clear monitoring and observability extension points
-- The data layer must be inspectable and lightweight
+- A user can authenticate and receive a session.
+- An authenticated user can classify a support-style document.
+- Multiple users can interact with the application independently.
+- Requests are filtered through a reverse proxy with rate limiting.
+- Application state remains inspectable through a lightweight local database.
 
-## Recommended Demo Story
-
-1. Show the use case and explain why a single process is not enough for the teaching goal.
-2. Trace one request from the browser to NGINX, the gateway, the SQLite-backed session store, and the model service.
-3. Introduce monitoring dashboards and discuss traffic, errors, latency, and saturation.
-4. Introduce logs and traces to investigate latency spikes, authentication failures, and rate limiting.
-
-## Branch Deliverables
+## Branch Progression
 
 ### `01-architecture-base`
 
-- FastAPI gateway
-- FastAPI model service
-- Streamlit UI
-- SQLite persistence in `data/`
-- NGINX reverse proxy with rate limiting
-- Docker Compose packaging
+Use this branch to understand:
+
+- the public entrypoint
+- the gateway role
+- the model-service role
+- the session lifecycle
+- the local SQLite persistence model
+
+Questions to answer in this branch:
+
+- Which service is exposed publicly?
+- Where is the session token created?
+- Which parts are stateful?
+- Which service actually performs inference?
 
 ### `02-monitoring-prometheus-grafana`
 
-- Prometheus scraping
-- Grafana dashboards
-- API golden signals
-- Basic domain metrics
+Use this branch to understand:
+
+- which metrics matter first on an API platform
+- how traffic, errors, latency, and saturation are exposed
+- how the gateway, model service, and ingress layer differ operationally
+
+Questions to answer in this branch:
+
+- Is traffic reaching the application?
+- Are failures concentrated on authentication, inference, or ingress?
+- Is latency increasing on one service or across the whole path?
 
 ### `03-observability-otel`
 
-- OpenTelemetry Collector
-- Tempo traces
-- Loki logs
-- Correlation across metrics, logs, and traces
+Use this branch to understand:
+
+- how to correlate a request across services
+- how to move from a symptom to a root cause
+- how logs and traces complement metrics
+
+Questions to answer in this branch:
+
+- Which request became slow?
+- Where did the extra time appear?
+- Was the failure caused by the application or by the edge layer?
+
+## Recommended Order of Exploration
+
+1. Start with the Streamlit UI and the architecture diagram in the branch README.
+2. Follow one login request and one classify request end to end.
+3. Use the branch doc that matches the current branch.
+4. Reproduce one manipulation from the README with `curl`.
+5. Compare what becomes visible as you move from architecture to monitoring to observability.
