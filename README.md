@@ -77,6 +77,12 @@ Default demo users:
 
 - `alice / mlops-demo`
 - `bob / mlops-demo`
+- `admin / mlops-demo`
+
+If you log in through Streamlit with `admin / mlops-demo`, the UI exposes:
+
+- an embedded monitoring cockpit from Grafana
+- an embedded observability cockpit for logs and investigation views
 
 ## Masterclass Manipulations
 
