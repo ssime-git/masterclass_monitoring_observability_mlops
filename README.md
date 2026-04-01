@@ -2,23 +2,53 @@
 
 This repository is a hands-on masterclass. You will build, monitor, and observe a small ML application step by step, one branch at a time.
 
-The starting point is a business need: classifying support messages. From there, we progressively answer three questions that matter in production MLOps:
+## It Starts with a Business Need
 
-1. **How should the application be structured?** (architecture)
-2. **How do we know what is happening?** (monitoring)
-3. **How do we find out why something went wrong?** (observability)
+A support team needs to classify incoming messages into categories (`billing`, `technical`, `account`) so they can route them faster. That is the business problem.
+
+But building a working classifier is only the beginning. In production MLOps, the real questions come after deployment:
+
+- How do we structure the application so it is secure, maintainable, and ready to operate?
+- How do we know the system is healthy once it runs?
+- How do we find out what went wrong when something breaks?
+
+These are not afterthoughts. **Monitoring and observability must be planned from the very first design decisions.** The architecture you choose, the way you split services, the boundaries you define: all of these determine how easy or hard it will be to monitor and debug the system later.
+
+This masterclass follows that exact progression.
+
+## Requirements That Guide the Entire Workshop
+
+Before writing any code, we define what the system needs to do and how it needs to behave. These requirements drive every architectural and operational choice across all branches.
+
+**Functional requirements:**
+
+- A user can authenticate and receive a session
+- An authenticated user can classify a support message
+- The application returns a label, a confidence score, and recent prediction history
+- The system rejects unauthenticated requests
+
+**Non-functional requirements:**
+
+- The public entry point must apply rate limiting to protect the system
+- Services must be isolated enough to scale, replace, or troubleshoot independently
+- The system must expose metrics so we can monitor its health
+- The system must produce structured logs and traces so we can investigate individual requests
+- Application state must be inspectable locally
+
+Notice that monitoring and observability appear in the non-functional requirements from the start. They are not features you bolt on later. They are constraints that shape how you build the application.
 
 ## Branch Path
 
-Each branch builds on the previous one. Start from the top and work your way down:
+Each branch implements a part of these requirements. Start from the top and work your way down:
 
-- **`01-architecture-base`** -- Build the application: services, authentication, sessions, persistence. Understand why each piece exists.
-- **`02-monitoring-prometheus-grafana`** -- Add Prometheus and Grafana. Learn to read dashboards and detect symptoms: traffic, errors, latency, saturation.
-- **`03-observability-otel`** -- Add logs and traces. Learn to investigate root causes: follow a single request across services, understand why it was slow, and distinguish application problems from edge failures.
+- **`01-architecture-base`** -- Implement the application architecture: services, authentication, sessions, persistence, rate limiting. The structure already anticipates monitoring and observability by exposing metrics endpoints and isolating services with clear boundaries.
+- **`02-monitoring-prometheus-grafana`** -- Add Prometheus and Grafana. Answer the question **"what is happening?"** by collecting and visualizing metrics. Check off the monitoring non-functional requirement.
+- **`03-observability-otel`** -- Add logs and traces. Answer the question **"why is it happening?"** by correlating requests across services. Check off the observability non-functional requirement.
 
 ## What You Will Learn
 
-- How to go from a business requirement to a structured, deployable ML application
+- How to go from a business need to functional and non-functional requirements that include operational concerns from day one
+- How architecture choices enable (or block) monitoring and observability
 - How to monitor APIs using a small set of meaningful signals
 - How to move from "something is wrong" (monitoring) to "here is why" (observability)
 - How to reproduce and investigate real behaviors locally with commands, not slides
