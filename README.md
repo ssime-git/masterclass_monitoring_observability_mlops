@@ -1,12 +1,12 @@
-# MLOps Monitoring and Observability Masterclass
+# MLOps Observability Masterclass Branch
 
-This branch is the final state of the workshop. It includes the base application, the monitoring stack, and the observability stack.
+In the previous branch, we added monitoring: Prometheus collects metrics and Grafana displays them as dashboards. We can now detect symptoms: traffic drops, errors spike, latency increases. But we cannot explain them. Which request caused the spike? Why was it slow? Where was time spent?
 
-## Monitoring vs Observability: Why Both?
+This branch activates the **observability non-functional requirement** defined on `main`. The question we now answer is: **why is it happening?**
 
-In the monitoring branch, we have already set up Prometheus and Grafana. They answer a question simple but essential: **what is happening in the system right now?** Traffic goes up, latency increases, errors appear. Metrics give you the big picture.
+## From Monitoring to Observability
 
-But when something goes wrong, knowing that latency went up is not enough. You need to understand **why**. Which specific request was slow? What path did it take through the services? What context did it carry? That is the question that observability answers.
+Monitoring answers **what** is happening. Observability answers **why**. They are complementary, and both were planned as non-functional requirements from the very first design decisions.
 
 In this branch, we add **logs** and **traces** on top of the existing metrics:
 
@@ -392,6 +392,16 @@ Observability Overview observability-overview dash-db
 
 Monitoring tells you something is happening. Observability tells you why it is happening and where to look. In production MLOps, you need both.
 
+## Workshop Complete
+
+With this branch, all the non-functional requirements defined on `main` are now addressed:
+
+- **Architecture** (branch 01): services, authentication, persistence, rate limiting, metrics endpoints ready
+- **Monitoring** (branch 02): Prometheus collects metrics, Grafana visualizes them, you can detect symptoms
+- **Observability** (branch 03): structured logs and distributed traces let you investigate root causes
+
+You started from a business need, defined requirements that included operational concerns from the start, and built toward full visibility one layer at a time.
+
 ## Useful Commands
 
 ```bash
@@ -404,6 +414,7 @@ docker compose down --remove-orphans
 
 ## Branch Context
 
+- Masterclass outline: [docs/masterclass-outline.md](docs/masterclass-outline.md)
 - Architecture notes: [docs/architecture-base.md](docs/architecture-base.md)
 - Monitoring notes: [docs/monitoring-prometheus-grafana.md](docs/monitoring-prometheus-grafana.md)
 - Observability notes: [docs/observability-otel.md](docs/observability-otel.md)

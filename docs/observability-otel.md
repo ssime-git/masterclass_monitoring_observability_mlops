@@ -1,12 +1,12 @@
 # Observability with OpenTelemetry, Loki, and Tempo
 
-## Application Context
+## From Monitoring to Observability
 
-This branch extends the monitored application with traces and logs so that an investigation can move from symptoms to causes.
+In branch `02-monitoring-prometheus-grafana`, we activated the monitoring non-functional requirement: Prometheus collects metrics, Grafana displays dashboards, and you can detect symptoms like traffic spikes, error increases, or latency changes.
 
-At this stage, the main question is:
+This branch activates the **observability non-functional requirement** defined on `main`. Services now produce structured logs and distributed traces, so an investigation can move from symptoms to causes.
 
-`Why is this happening?`
+The question we answer here: **why is this happening?**
 
 The system still exposes the same login and classification flows, but each request now leaves more diagnostic evidence across services.
 

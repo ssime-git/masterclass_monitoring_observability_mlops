@@ -1,12 +1,12 @@
 # Monitoring with Prometheus and Grafana
 
-## Application Context
+## From Architecture to Monitoring
 
-This final branch keeps the same monitoring layer as the dedicated monitoring branch and adds logs and traces on top of it.
+In branch `01-architecture-base`, we built the application and made sure every service already exposes a `/metrics` endpoint. Branch `02-monitoring-prometheus-grafana` activated the monitoring non-functional requirement by adding Prometheus and Grafana.
 
-The monitoring question stays the same:
+This branch keeps the same monitoring layer and adds logs and traces on top of it. The monitoring question stays the same:
 
-`What is happening in the system right now?`
+**What is happening in the system right now?**
 
 Metrics remain the fastest way to answer that question before opening logs or traces.
 
