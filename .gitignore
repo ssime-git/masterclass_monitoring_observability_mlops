@@ -1,0 +1,16 @@
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+data/*.db
+data/grafana/
+data/loki/
+data/tempo/
+dist/
+build/
+htmlcov/
