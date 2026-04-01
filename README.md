@@ -1,21 +1,27 @@
 # Monitoring and Observability for MLOps
 
-This repository supports a hands-on masterclass about architecture, monitoring, and observability in a small ML-oriented microservice system.
+This repository is a hands-on masterclass. You will build, monitor, and observe a small ML application step by step, one branch at a time.
 
-Use `main` as the entrypoint for the workshop structure, then move branch by branch to reproduce the progressive build-up of the platform.
+The starting point is a business need: classifying support messages. From there, we progressively answer three questions that matter in production MLOps:
+
+1. **How should the application be structured?** (architecture)
+2. **How do we know what is happening?** (monitoring)
+3. **How do we find out why something went wrong?** (observability)
 
 ## Branch Path
 
-- `01-architecture-base`: core application, security boundaries, sessions, and SQLite persistence
-- `02-monitoring-prometheus-grafana`: Prometheus and Grafana dashboards for API golden signals
-- `03-observability-otel`: logs, traces, correlation, and root-cause analysis
+Each branch builds on the previous one. Start from the top and work your way down:
 
-## What Students Learn Across the Repository
+- **`01-architecture-base`** -- Build the application: services, authentication, sessions, persistence. Understand why each piece exists.
+- **`02-monitoring-prometheus-grafana`** -- Add Prometheus and Grafana. Learn to read dashboards and detect symptoms: traffic, errors, latency, saturation.
+- **`03-observability-otel`** -- Add logs and traces. Learn to investigate root causes: follow a single request across services, understand why it was slow, and distinguish application problems from edge failures.
 
-- How to decompose a simple ML application into explicit services
-- How to monitor APIs with a small set of useful signals
-- How to move from symptom detection to investigation
-- How to reproduce behaviors locally with commands instead of slides alone
+## What You Will Learn
+
+- How to go from a business requirement to a structured, deployable ML application
+- How to monitor APIs using a small set of meaningful signals
+- How to move from "something is wrong" (monitoring) to "here is why" (observability)
+- How to reproduce and investigate real behaviors locally with commands, not slides
 
 ## Model Used Across the Workshop
 
@@ -29,13 +35,15 @@ It is not a trained statistical model. This is intentional:
 
 If you later want a trained model, this repository already gives you the right service boundaries to swap the inference logic without redesigning the system.
 
-The runnable branches now follow a service-first source layout:
+The source code follows a service-first layout:
 
-- `src/services/`: gateway and model service
-- `src/ui/`: Streamlit application
-- `src/shared/`: shared models, schemas, persistence, metrics, and support code
+- `src/services/` -- gateway and model service
+- `src/ui/` -- Streamlit application
+- `src/shared/` -- shared models, schemas, persistence, metrics, and support code
 
 ## Target Architecture
+
+This is the full architecture you will build across all three branches. Each branch adds a layer: first the application services, then monitoring, then observability.
 
 ```mermaid
 flowchart LR
@@ -66,14 +74,16 @@ flowchart LR
     NGINX -. Access logs .-> Promtail
 ```
 
-## Recommended Workshop Flow
+## How to Follow the Masterclass
 
-1. Read this branch and the outline in [docs/masterclass-outline.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/masterclass-outline.md).
-2. Switch to `01-architecture-base` and run the base stack.
-3. Switch to `02-monitoring-prometheus-grafana` and reproduce the monitoring exercises.
-4. Switch to `03-observability-otel` and reproduce the investigation exercises.
+1. Start here on `main` to understand the business context and the overall plan. Read the workshop outline in [docs/masterclass-outline.md](docs/masterclass-outline.md) for the full progression.
+2. Switch to `01-architecture-base`, run the stack, and explore the application architecture.
+3. Switch to `02-monitoring-prometheus-grafana`, run the stack, and learn to read monitoring dashboards.
+4. Switch to `03-observability-otel`, run the stack, and practice investigating with logs and traces.
 
-## Commands to Move Through the Masterclass
+Each branch has its own README with step-by-step manipulations. Follow them in order.
+
+## Commands to Move Through the Branches
 
 ```bash
 git checkout 01-architecture-base
@@ -90,7 +100,7 @@ make test
 make up
 ```
 
-Common cleanup command:
+Between branches, clean up the running containers:
 
 ```bash
 docker compose down --remove-orphans
@@ -98,4 +108,4 @@ docker compose down --remove-orphans
 
 ## Supporting Notes
 
-- Workshop outline: [docs/masterclass-outline.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/masterclass-outline.md)
+- Workshop outline: [docs/masterclass-outline.md](docs/masterclass-outline.md)
