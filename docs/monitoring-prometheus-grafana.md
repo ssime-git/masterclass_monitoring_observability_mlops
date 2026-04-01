@@ -1,14 +1,12 @@
 # Monitoring with Prometheus and Grafana
 
-## Application Context
+## From Architecture to Monitoring
 
-This branch keeps the same application architecture and adds the first operational layer: metrics.
+In branch `01-architecture-base`, we built the application and made sure every service already exposes a `/metrics` endpoint. That was a deliberate architectural decision: preparing for monitoring from day one.
 
-At this stage, the main question is:
+This branch activates the monitoring non-functional requirement defined on `main`. Prometheus now collects the metrics that the services already expose, and Grafana turns them into dashboards.
 
-`What is happening in the system right now?`
-
-The answer comes from time-series metrics collected from the gateway, the model service, and the NGINX edge layer.
+The question we answer here: **what is happening in the system right now?**
 
 ## Metric Flow
 
@@ -332,4 +330,4 @@ Metrics do not fully answer:
 - why that exact request was slow?
 - what happened inside the gateway versus inside the model service?
 
-That is the transition to the observability branch: metrics are excellent at locating symptoms, but weak at reconstructing one request end to end.
+That is the transition to the next branch (`03-observability-otel`): metrics are excellent at locating symptoms, but weak at reconstructing one request end to end. To answer **why** something happened, we need logs and traces.

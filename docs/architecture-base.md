@@ -1,31 +1,29 @@
 # Base Application Architecture
 
-## Application Context
+## From Requirements to Architecture
 
-The application classifies short support-style messages into three categories:
+On `main`, we defined the business need and the full list of requirements. This document explains how the architecture in branch `01-architecture-base` implements them.
 
-- `billing`
-- `technical`
-- `account`
+The application classifies short support-style messages into three categories: `billing`, `technical`, `account`. The goal is not to train a model. The goal is to understand how a small ML-enabled application is structured, protected, and prepared for operational visibility.
 
-The goal is not to train a model. The goal is to understand how a small ML-enabled application is exposed to users, protected at the edge, and split into services that remain easy to operate.
+## Requirements Addressed in Branch 01
 
-## Functional Requirements
+The functional and non-functional requirements are defined in the [masterclass outline](masterclass-outline.md). Here is how the architecture addresses them:
 
-- A user can log in with a username and password.
-- Each authenticated user gets an independent session.
-- An authenticated user can send a text document for classification.
-- The application returns a label, a confidence score, and recent prediction history for that session.
-- The system rejects unauthenticated requests.
-- The public entrypoint applies basic rate limiting before requests reach the API.
+**Functional requirements** (all implemented in branch 01):
 
-## Non-Functional Requirements
+- Authentication and sessions: handled by the gateway, persisted in SQLite
+- Document classification: handled by the model service, called through the gateway
+- Prediction history: stored per session in SQLite, returned with each classification
+- Access control: the gateway rejects unauthenticated requests before they reach the model
 
-- The architecture must stay small enough to understand locally.
-- The security boundary must be explicit.
-- Session state must survive service restarts through a local database file.
-- Services must be isolated enough to discuss responsibility, scaling, and troubleshooting separately.
-- The stack must start reproducibly with Docker Compose and `uv` based workflows.
+**Non-functional requirements** (partially implemented in branch 01):
+
+- Rate limiting: NGINX applies it at the edge before requests reach the gateway
+- Service isolation: each service has a single responsibility and clear boundaries
+- Metrics endpoints: already exposed by the gateway and model service, ready for Prometheus in this branch
+- Structured logs and traces: not yet active, but the service boundaries are designed to support them in branch 03
+- Local inspectability: SQLite is mounted from `data/`, readable from the host
 
 ## Services and Responsibilities
 
@@ -59,6 +57,7 @@ The goal is not to train a model. The goal is to understand how a small ML-enabl
 - Which service owns inference
 - How the session token moves from login to protected routes
 - Which parts are stateful and which parts are stateless
+- Why metrics endpoints are present even though nothing collected them in branch 01
 
 ## Local Commands
 

@@ -1,6 +1,8 @@
 # MLOps Monitoring Masterclass Branch
 
-This branch adds monitoring to the base application. In the previous branch, you built and explored the architecture. Now the question becomes: **what is happening in the system?**
+In the previous branch, we built the application architecture: services, authentication, persistence, rate limiting. The structure is in place, and the services already expose metrics endpoints. But nothing collects those metrics yet.
+
+This branch activates the **monitoring non-functional requirement** defined on `main`. The question we now answer is: **what is happening in the system?**
 
 ## Why Monitoring Matters
 
@@ -334,6 +336,12 @@ Monitoring does not answer:
 
 Those deeper questions require **observability** (logs and traces), which is the subject of the next branch.
 
+## What Comes Next
+
+Monitoring tells you that something changed. But when latency spikes, you cannot tell which request caused it, or why it was slow. The next branch adds **logs and traces** to answer the question: **why is it happening?**
+
+Continue to `03-observability-otel`.
+
 ## Useful Commands
 
 ```bash
@@ -345,5 +353,6 @@ docker compose down --remove-orphans
 
 ## Branch Context
 
+- Masterclass outline: [docs/masterclass-outline.md](docs/masterclass-outline.md)
 - Architecture notes: [docs/architecture-base.md](docs/architecture-base.md)
 - Monitoring notes: [docs/monitoring-prometheus-grafana.md](docs/monitoring-prometheus-grafana.md)
