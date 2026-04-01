@@ -47,3 +47,17 @@ The workshop is designed for learners who already know the basics of:
 - Prefer guided exploration and prepared demo scenarios over long live-coding segments.
 
 Additional session notes live in [docs/masterclass-outline.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/masterclass-outline.md).
+
+## Branch Setup
+
+When you switch to a runnable branch, use:
+
+```bash
+make install
+make lint
+make typecheck
+make test
+make up
+```
+
+The architecture branch also provides [docs/architecture-base.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/architecture-base.md).

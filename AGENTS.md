@@ -9,6 +9,25 @@ This file defines the default engineering, review, and contribution standards fo
 - Prefer small files and focused units of logic over large, multi-purpose modules.
 - Write code that is explicit and maintainable rather than clever.
 - Add unit tests for all production changes unless there is a clear and documented reason not to.
+- Prefer the simplest solution that correctly solves the problem.
+- Do not introduce abstraction, configuration, or extensibility before there is a real use case.
+- Avoid duplication of important logic, while also avoiding premature abstraction.
+- Leave the codebase in a cleaner state than you found it.
+
+## Engineering Principles
+
+- Apply `KISS`: keep solutions simple and proportionate to the problem.
+- Apply `YAGNI`: do not build speculative features or abstractions.
+- Apply `DRY`: reduce duplicated logic where doing so improves maintainability.
+- Follow single-responsibility principles for modules, classes, and functions.
+- Prefer explicit code over implicit behavior.
+- Prefer composition over inheritance unless inheritance is clearly justified.
+- Keep public interfaces small, stable, and well-typed.
+- Separate pure business logic from I/O, framework glue, and external service integration.
+- Avoid hidden side effects and unnecessary shared mutable state.
+- Fail fast on invalid input at the correct boundary with clear error messages.
+- Preserve backward compatibility unless a breaking change is intentional, documented, and tested.
+- Default to secure practices: never hardcode secrets, validate external input, and use the least privilege needed.
 
 ## Code Style
 

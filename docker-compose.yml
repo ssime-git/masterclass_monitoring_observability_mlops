@@ -1,0 +1,47 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gateway
+    environment:
+      APP_NAME: gateway
+      DATABASE_URL: sqlite:////app/data/masterclass.db
+      MODEL_SERVICE_URL: http://model-service:8001
+      SESSION_TTL_MINUTES: 90
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - model-service
+    expose:
+      - "8000"
+
+  model-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.model
+    environment:
+      APP_NAME: model-service
+      INFERENCE_DELAY_SECONDS: 0.0
+    expose:
+      - "8001"
+
+  streamlit-ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.streamlit
+    environment:
+      PUBLIC_API_URL: http://nginx:8080
+    depends_on:
+      - nginx
+    ports:
+      - "8501:8501"
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
