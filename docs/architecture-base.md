@@ -1,31 +1,29 @@
 # Base Application Architecture
 
-## Application Context
+## From Requirements to Architecture
 
-The application classifies short support-style messages into three categories:
+On `main`, we defined the business need and the full list of requirements. This document explains how the architecture in this branch implements them.
 
-- `billing`
-- `technical`
-- `account`
+The application classifies short support-style messages into three categories: `billing`, `technical`, `account`. The goal is not to train a model. The goal is to understand how a small ML-enabled application is structured, protected, and prepared for operational visibility.
 
-The goal is not to train a model. The goal is to understand how a small ML-enabled application is exposed to users, protected at the edge, and split into services that remain easy to operate.
+## Requirements Addressed in This Branch
 
-## Functional Requirements
+The functional and non-functional requirements are defined in the [masterclass outline](masterclass-outline.md). Here is how this branch addresses them:
 
-- A user can log in with a username and password.
-- Each authenticated user gets an independent session.
-- An authenticated user can send a text document for classification.
-- The application returns a label, a confidence score, and recent prediction history for that session.
-- The system rejects unauthenticated requests.
-- The public entrypoint applies basic rate limiting before requests reach the API.
+**Functional requirements** (all implemented here):
 
-## Non-Functional Requirements
+- Authentication and sessions: handled by the gateway, persisted in SQLite
+- Document classification: handled by the model service, called through the gateway
+- Prediction history: stored per session in SQLite, returned with each classification
+- Access control: the gateway rejects unauthenticated requests before they reach the model
 
-- The architecture must stay small enough to understand locally.
-- The security boundary must be explicit.
-- Session state must survive service restarts through a local database file.
-- Services must be isolated enough to discuss responsibility, scaling, and troubleshooting separately.
-- The stack must start reproducibly with Docker Compose and `uv` based workflows.
+**Non-functional requirements** (partially implemented here):
+
+- Rate limiting: NGINX applies it at the edge before requests reach the gateway
+- Service isolation: each service has a single responsibility and clear boundaries
+- Metrics endpoints: already exposed by the gateway and model service, ready for Prometheus in branch 02
+- Structured logs and traces: not yet active, but the service boundaries are designed to support them in branch 03
+- Local inspectability: SQLite is mounted from `data/`, readable from the host
 
 ## Services and Responsibilities
 
@@ -52,23 +50,19 @@ The goal is not to train a model. The goal is to understand how a small ML-enabl
 - Rate limiting happens before the gateway, at the `nginx` layer.
 - SQLite is mounted from `data/`, so the application state remains inspectable from the host machine.
 
-## Metrics Endpoints
+## Metrics Endpoints: Preparing for Monitoring
 
-Both the gateway and the model service expose a `/metrics` endpoint in Prometheus format.
+Both the gateway and the model service already expose a `/metrics` endpoint in Prometheus format. Nothing collects these metrics yet, but they are ready for the monitoring branch.
 
-```bash
-curl -s http://localhost:8080/metrics | grep masterclass_
-```
+This is an important architectural decision: **metrics are exposed from day one**, not added as an afterthought. When Prometheus arrives in branch 02, it only needs to be configured to scrape these endpoints. No application code changes are needed.
 
-Available metrics in this branch:
+Available metrics:
 
 - `masterclass_http_requests_total` — request count by service, method, path, and HTTP status
 - `masterclass_http_request_duration_seconds` — request latency histogram by service, method, and path
 - `masterclass_http_in_progress_requests` — in-flight request count by service
 - `masterclass_active_sessions` — count of non-expired sessions tracked by the gateway
 - `masterclass_predictions_total` — prediction count by service and classification label
-
-These metrics are not collected by anything in this branch. They exist to support the monitoring layer added in `02-monitoring-prometheus-grafana`.
 
 ## What to Inspect
 
@@ -77,6 +71,7 @@ These metrics are not collected by anything in this branch. They exist to suppor
 - Which service owns inference
 - How the session token moves from login to protected routes
 - Which parts are stateful and which parts are stateless
+- Why metrics endpoints are present even though nothing collects them yet
 
 ## Local Commands
 
@@ -131,3 +126,7 @@ Inspect persisted state:
 ls -lh data/
 sqlite3 data/masterclass.db '.tables'
 ```
+
+## What Comes Next
+
+The architecture is in place and the services are running. But if latency increases or errors spike, there is no way to notice. The next branch (`02-monitoring-prometheus-grafana`) adds Prometheus and Grafana to answer: **what is happening in the system?**

@@ -1,20 +1,21 @@
 # MLOps Architecture Base Branch
 
-This is the first hands-on branch of the masterclass. The `main` branch defined what we need to build and why. Now we build it.
+On `main`, we defined the business need (classifying support messages) and the requirements that guide the entire workshop, both functional and non-functional. Now we implement them.
 
-This branch contains the running application: a small ML system that classifies support messages. The goal here is not to train a model, but to understand **how the application is structured** and **why each service exists**.
+This branch builds the running application. The goal is not to train a model, but to understand **how the application is structured** and **why each service exists**.
 
 ## Why Architecture Matters in MLOps
 
 In production, an ML model is never just a model. It needs an API to receive requests, authentication to control access, a database to persist sessions and history, and a reverse proxy to protect the system from overload. If you skip these concerns, you end up with a fragile prototype that breaks the moment real users interact with it.
 
-This branch sets up all those pieces so that in the next branches, you can focus on monitoring and observability without worrying about the foundation.
+The architecture also **prepares the ground for monitoring and observability**. In this branch, every service already exposes a `/metrics` endpoint, even though nothing collects those metrics yet. Services are isolated with clear boundaries, so that when we add Prometheus, Grafana, logs, and traces in the next branches, the structure is already in place. This is what it means to plan operational visibility from the start.
 
 ## What You Will Explore
 
 - How the application is split into distinct services, each with a clear responsibility
 - How a user request travels from the browser through NGINX, the gateway, and the model service
 - Where authentication and session management live, and why those choices matter
+- Why metrics endpoints exist in this branch even though monitoring comes later
 - How to inspect the database to see what the application persists
 
 ## Model Used in This Branch
@@ -161,6 +162,13 @@ docker compose logs -f model-service
 docker compose down --remove-orphans
 ```
 
+## What Comes Next
+
+The architecture is in place. The services run, the requests flow, and the state is persisted. But right now, if latency increases or errors spike, you have no way to notice. The next branch adds **monitoring** to answer the question: **what is happening in the system?**
+
+Continue to `02-monitoring-prometheus-grafana`.
+
 ## Branch Context
 
 - Architecture notes: [docs/architecture-base.md](docs/architecture-base.md)
+- Masterclass outline: [docs/masterclass-outline.md](docs/masterclass-outline.md)
