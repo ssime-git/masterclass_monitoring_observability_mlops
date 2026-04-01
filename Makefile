@@ -21,8 +21,8 @@ test-model:
 	$(UV) run pytest tests/model
 
 up:
-	docker compose up --build
+	docker compose up --build -d
 
 down:
-	docker compose down --remove-orphans
+	docker compose down -v --remove-orphans --rmi all
 
