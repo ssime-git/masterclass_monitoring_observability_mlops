@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from shared.models import PredictionRecord, SessionRecord, User
@@ -56,8 +56,13 @@ class SessionRepository:
         self.session.commit()
 
     def count_active(self) -> int:
-        statement = select(SessionRecord)
-        return len(list(self.session.scalars(statement)))
+        now = utc_now()
+        statement = (
+            select(func.count())
+            .select_from(SessionRecord)
+            .where(SessionRecord.expires_at > now)
+        )
+        return self.session.execute(statement).scalar_one()
 
 
 class PredictionRepository:

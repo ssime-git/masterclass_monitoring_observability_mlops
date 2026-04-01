@@ -1,6 +1,6 @@
 UV := uv
 
-.PHONY: install lint typecheck test test-gateway test-model up down
+.PHONY: install lint typecheck test test-gateway test-model test-streamlit up down
 
 install:
 	$(UV) sync --extra dev
@@ -19,6 +19,9 @@ test-gateway:
 
 test-model:
 	$(UV) run pytest tests/model
+
+test-streamlit:
+	$(UV) run pytest tests/streamlit
 
 up:
 	docker compose up --build

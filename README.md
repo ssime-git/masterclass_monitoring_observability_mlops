@@ -11,7 +11,7 @@ This branch is the final state of the workshop. It includes the base application
 
 ## Model Used in This Branch
 
-The current classifier is a deterministic keyword-based model implemented in [src/shared/model_logic.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/shared/model_logic.py).
+The current classifier is a deterministic keyword-based model implemented in [src/shared/model_logic.py](src/shared/model_logic.py).
 
 It is not a trained statistical model. That is intentional for this masterclass:
 
@@ -164,6 +164,6 @@ docker compose down --remove-orphans
 
 ## Branch Context
 
-- Architecture notes: [docs/architecture-base.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/architecture-base.md)
-- Monitoring notes: [docs/monitoring-prometheus-grafana.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/monitoring-prometheus-grafana.md)
-- Observability notes: [docs/observability-otel.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/observability-otel.md)
+- Architecture notes: [docs/architecture-base.md](docs/architecture-base.md)
+- Monitoring notes: [docs/monitoring-prometheus-grafana.md](docs/monitoring-prometheus-grafana.md)
+- Observability notes: [docs/observability-otel.md](docs/observability-otel.md)

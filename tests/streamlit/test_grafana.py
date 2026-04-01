@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse
 from ui.streamlit.grafana import (
     DEFAULT_GRAFANA_RANGE,
     MONITORING_DASHBOARD_UID,
+    OBSERVABILITY_DASHBOARD_UID,
     build_dashboard_url,
 )
 
@@ -21,3 +22,10 @@ def test_build_dashboard_url_targets_expected_dashboard() -> None:
     assert query["theme"] == ["light"]
     assert query["refresh"] == ["5s"]
     assert query["kiosk"] == [""]
+
+
+def test_build_dashboard_url_targets_observability_dashboard() -> None:
+    url = build_dashboard_url("http://localhost:3000", OBSERVABILITY_DASHBOARD_UID)
+
+    parsed = urlparse(url)
+    assert parsed.path == f"/d/{OBSERVABILITY_DASHBOARD_UID}/{OBSERVABILITY_DASHBOARD_UID}"
