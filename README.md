@@ -1,44 +1,19 @@
-# Monitoring and Observability for MLOps Masterclass
+# MLOps Architecture Base Branch
 
-This repository supports a 2-hour, beginner-friendly masterclass about monitoring and observability in an MLOps-oriented microservice system.
+This branch contains the base application used in the masterclass. It is the branch used to explain the use case, the service boundaries, and the first security and persistence choices.
 
-The learning path is split across cumulative branches:
+## What Students Explore
 
-- `main`: course framing, branch map, and teaching notes
-- `01-architecture-base`: a simple document-classification system with security, sessions, SQLite persistence, and Docker packaging
-- `02-monitoring-prometheus-grafana`: Prometheus and Grafana dashboards focused on API golden signals
-- `03-observability-otel`: OpenTelemetry, logs, traces, and root-cause analysis workflows
+- Why the application is split into UI, ingress, gateway, persistence, and model service
+- Where authentication, session validation, and rate limiting live
+- How a request flows through the system
+- Why SQLite is a useful teaching database for a local microservice demo
 
-## Learning Goals
+## Model Used in This Branch
 
-- Understand why a simple ML application benefits from a microservice architecture
-- Identify where security, sessions, and persistence belong in the stack
-- Monitor API health with golden-signal dashboards
-- Move from symptom detection to root-cause analysis with logs and traces
+The current classifier is a deterministic keyword-based model implemented in [src/masterclass_mlops/model_logic.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/masterclass_mlops/model_logic.py).
 
-## Use Case
-
-The application classifies short support-style messages into one of three categories:
-
-- `billing`
-- `technical`
-- `account`
-
-The model is intentionally lightweight so the session can focus on architecture, monitoring, and debugging rather than model training.
-
-## Audience
-
-The workshop is designed for learners who already know the basics of:
-
-- Linux and Bash
-- Docker and Docker Compose
-- HTTP APIs
-
-## Branch Progression
-
-1. Start on `01-architecture-base` to explain the use case, requirements, and service boundaries.
-2. Move to `02-monitoring-prometheus-grafana` to answer: "What is happening in the system?"
-3. Move to `03-observability-otel` to answer: "Why is it happening?"
+It is not a trained statistical model. This keeps the branch focused on architecture and request flow.
 
 ## Architecture Diagram
 
@@ -46,22 +21,20 @@ The workshop is designed for learners who already know the basics of:
 flowchart LR
     User["Learner Browser"] --> UI["Streamlit UI"]
     UI --> NGINX["NGINX Reverse Proxy<br/>Rate Limiting"]
+    UI --> API["HTTP API Calls"]
+    API --> NGINX
     NGINX --> Gateway["FastAPI Gateway<br/>Auth and Session Validation"]
     Gateway --> SQLite[("SQLite<br/>users, sessions, history")]
     Gateway --> Model["FastAPI Model Service<br/>Document Classification"]
 ```
 
-## Teaching Notes
+## Prerequisites
 
-- Keep the live session focused on a small number of components and dashboards.
-- Use branch diffs to make each new concern visible and deliberate.
-- Prefer guided exploration and prepared demo scenarios over long live-coding segments.
+- Docker and Docker Compose
+- `uv`
+- Bash
 
-Additional session notes live in [docs/masterclass-outline.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/masterclass-outline.md).
-
-## Branch Setup
-
-When you switch to a runnable branch, use:
+## Run the Branch
 
 ```bash
 make install
@@ -71,4 +44,89 @@ make test
 make up
 ```
 
-The architecture branch also provides [docs/architecture-base.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/architecture-base.md).
+Open these services after startup:
+
+- Streamlit UI: `http://localhost:8501`
+- Public API through NGINX: `http://localhost:8080`
+
+Default demo users:
+
+- `alice / mlops-demo`
+- `bob / mlops-demo`
+
+## Masterclass Manipulations
+
+### 1. Log in and inspect the session flow
+
+```bash
+curl -i -s http://localhost:8080/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"mlops-demo"}'
+```
+
+What to discuss:
+
+- the request enters through NGINX
+- the gateway validates credentials
+- a session token is created and stored in SQLite
+
+### 2. Classify a document through the gateway
+
+```bash
+TOKEN="$(curl -s http://localhost:8080/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"mlops-demo"}' \
+  | python3 -c 'import sys, json; print(json.load(sys.stdin)["access_token"])')"
+
+curl -i -s http://localhost:8080/api/classify \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"My profile login does not work after the password reset."}'
+```
+
+What to discuss:
+
+- why the UI never talks directly to the model service
+- why the gateway owns auth and routing
+- how recent prediction history is tied to the session
+
+### 3. Reproduce an unauthenticated failure
+
+```bash
+curl -i -s http://localhost:8080/api/classify \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"My payment failed and I need help."}'
+```
+
+What to discuss:
+
+- why the request is rejected
+- why the gateway is the right boundary for this control
+
+### 4. Inspect the SQLite file used by the application
+
+```bash
+ls -lh data/
+sqlite3 data/masterclass.db '.tables'
+sqlite3 data/masterclass.db 'select username from users;'
+sqlite3 data/masterclass.db 'select id, user_id, expires_at from sessions;'
+```
+
+Use this to show students:
+
+- persisted users
+- persisted sessions
+- why SQLite is easy to inspect during a workshop
+
+## Useful Commands
+
+```bash
+docker compose ps
+docker compose logs -f gateway
+docker compose logs -f model-service
+docker compose down --remove-orphans
+```
+
+## Branch Context
+
+- Architecture notes: [docs/architecture-base.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/architecture-base.md)
