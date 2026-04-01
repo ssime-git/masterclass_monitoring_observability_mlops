@@ -10,6 +10,24 @@ At this stage, the main question is:
 
 The answer comes from time-series metrics collected from the gateway, the model service, and the NGINX edge layer.
 
+## Metric Flow
+
+```mermaid
+flowchart LR
+    Gateway["gateway /metrics"] --> Prometheus["Prometheus"]
+    Model["model-service /metrics"] --> Prometheus
+    Exporter["nginx-prometheus-exporter"] --> Prometheus
+    Nginx["NGINX stub_status"] --> Exporter
+    Prometheus --> Grafana["Grafana dashboard"]
+```
+
+Use this diagram while teaching:
+
+- application services expose business and HTTP metrics
+- the exporter turns NGINX status into Prometheus metrics
+- Prometheus scrapes
+- Grafana visualizes
+
 ## Monitoring Scope
 
 - Prometheus scrapes metrics exposed by the application services
@@ -24,99 +42,228 @@ The answer comes from time-series metrics collected from the gateway, the model 
 - `latency`: how long the main routes take to respond
 - `saturation`: whether the system is under pressure through active connections or in-flight requests
 
-## Application-Focused Requirements
+## How to Read the Dashboard
 
-- The public API must expose metrics without changing the functional behavior of the application.
-- The monitoring view must stay small enough to read quickly during an investigation.
-- The dashboard must cover the gateway, model service, and edge layer.
-- The dashboard must help distinguish authentication issues, inference latency, and ingress pressure.
+Start with the outside-in question:
 
-## What the Dashboard Shows
+`Is the system healthy from the user point of view?`
 
-- gateway request rate
-- gateway error rate
-- gateway `p50` and `p95` latency
-- model-service `p50` and `p95` latency
-- in-progress API requests
-- active NGINX connections
-- active sessions
-- predictions grouped by class
+Then read the dashboard in this order:
 
-## How to Read the Branch
+1. Traffic: do requests reach the gateway at all?
+2. Errors: are failures concentrated on auth, inference, or ingress?
+3. Latency: is slowdown visible on the gateway, the model service, or both?
+4. Saturation: is the edge or the application under pressure first?
 
-Start with the question:
+This reading order gives students a repeatable investigation habit.
 
-`Is the system healthy from the outside?`
+## What Each Metric Means
 
-Then check:
+- `masterclass_http_requests_total`
+  - Counts requests by `service`, `method`, `path`, and `status`.
+  - Use it to explain traffic shape and to separate healthy calls from errors.
 
-1. Is traffic arriving?
-2. Are errors increasing?
-3. Is latency stable or degrading?
-4. Is the edge layer saturating before the application fails?
+- `masterclass_http_request_duration_seconds`
+  - Histogram of request latency by `service`, `method`, and `path`.
+  - Use it to explain `p50` and `p95`.
+  - `p50` shows the common case; `p95` shows the slower tail.
 
-Metrics help you see the symptom and its timing. They do not explain the full root cause by themselves.
+- `masterclass_http_in_progress_requests`
+  - Number of requests currently being processed by a service.
+  - Use it to discuss pressure, concurrency, and work in flight.
 
-## Local Commands
+- `masterclass_active_sessions`
+  - Number of non-expired sessions tracked by the gateway.
+  - Use it to connect authentication activity with user state.
 
-Install and validate:
+- `masterclass_predictions_total`
+  - Number of predictions by `service` and `label`.
+  - Use it to link monitoring to user-facing ML behavior.
+
+## Verified Raw Entry Points
+
+Use these commands before opening Grafana so students can see the data source directly.
+
+Shortcut:
 
 ```bash
-make install
-make lint
-make typecheck
-make test
+make demo-targets
 ```
 
-Start and stop the stack:
+Underlying commands:
 
 ```bash
-make up
-make down
+curl -i -s http://localhost:8080/metrics
+
+curl -s http://localhost:9090/api/v1/targets | python3 -c '
+import sys, json
+payload = json.load(sys.stdin)
+for target in payload["data"]["activeTargets"]:
+    print(target["labels"].get("job"), target["health"], target["scrapeUrl"])
+'
+
+curl -s 'http://localhost:9090/api/v1/query?query=masterclass_http_requests_total' \
+  | python3 -c '
+import sys, json
+payload = json.load(sys.stdin)
+for item in payload["data"]["result"][:8]:
+    print(item["metric"], item["value"][1])
+'
 ```
 
-Open after startup:
+Example output:
 
-- Streamlit UI: `http://localhost:8501`
-- Public API through NGINX: `http://localhost:8080`
-- Grafana: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
+```text
+HTTP/1.1 404 Not Found
+Server: nginx/1.27.5
 
-Demo accounts:
+gateway up http://gateway:8000/metrics
+model-service up http://model-service:8001/metrics
+nginx up http://nginx-exporter:9113/metrics
 
-- `alice / mlops-demo`
-- `bob / mlops-demo`
-- `admin / mlops-demo`
+{'__name__': 'masterclass_http_requests_total', 'instance': 'gateway:8000', 'job': 'gateway', 'method': 'POST', 'path': '/auth/login', 'service': 'gateway', 'status': '401'} 1
+{'__name__': 'masterclass_http_requests_total', 'instance': 'gateway:8000', 'job': 'gateway', 'method': 'POST', 'path': '/api/classify', 'service': 'gateway', 'status': '200'} 1
+{'__name__': 'masterclass_http_requests_total', 'instance': 'model-service:8001', 'job': 'model-service', 'method': 'POST', 'path': '/predict', 'service': 'model-service', 'status': '200'} 1
+```
 
-Use `admin / mlops-demo` in Streamlit to open the embedded monitoring cockpit directly from the UI.
+Teaching note:
 
-## Reproduce the Main Monitoring Scenarios
+- In this branch, the public NGINX surface does not proxy `/metrics`.
+- Prometheus targets and Prometheus queries are the reliable raw monitoring entrypoints.
 
-Create baseline traffic:
+## Standard Demo Flow
+
+### Scenario 1: Healthy login and classify
+
+Goal:
+Create baseline traffic and confirm the system is healthy.
+
+Shortcut:
 
 ```bash
-TOKEN="$(curl -s http://localhost:8080/auth/login \
+make demo-baseline
+```
+
+Underlying commands:
+
+```bash
+LOGIN="$(curl -i -s http://localhost:8080/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"mlops-demo"}' \
+  -d '{"username":"alice","password":"mlops-demo"}')"
+
+printf '%s\n' "${LOGIN}"
+
+TOKEN="$(printf '%s' "${LOGIN}" | tail -n 1 \
   | python3 -c 'import sys, json; print(json.load(sys.stdin)["access_token"])')"
 
-for _ in $(seq 1 5); do
-  curl -s http://localhost:8080/api/classify \
-    -H "Authorization: Bearer ${TOKEN}" \
-    -H 'Content-Type: application/json' \
-    -d '{"text":"I need help with my account login."}' > /dev/null
-done
+sleep 5
+
+curl -i -s http://localhost:8080/api/classify \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"My payment failed and I need a refund for my subscription."}'
 ```
 
-Trigger authentication errors:
+Example output:
+
+```text
+HTTP/1.1 200 OK
+{"access_token":"<token>","token_type":"bearer","username":"alice","expires_at":"2026-04-01T20:23:00.579204"}
+
+HTTP/1.1 200 OK
+{"result":{"label":"billing","confidence":0.8500000000000001,"processing_time_ms":0.029625000024680048},"history":[{"text":"My payment failed and I need a refund for my subscription.","predicted_label":"billing","confidence":0.8500000000000001,"created_at":"2026-04-01T18:53:06.422567"}]}
+```
+
+What changed operationally:
+
+- Gateway request count rose for `/auth/login` and `/api/classify`.
+- Model-service request count rose for `/predict`.
+- Prediction count increased for label `billing`.
+
+How to explain it live:
+
+- Healthy traffic should increase traffic and prediction counters without pushing errors up.
+- This is the baseline that makes later failures and spikes easier to interpret.
+
+Common learner confusion:
+
+- One request does not create a meaningful latency trend.
+- Use this moment to explain why Prometheus stores a series over time, not just the last value.
+
+Expected dashboard focus:
+
+- gateway request rate
+- model-service request rate
+- prediction counts by label
+- active sessions
+
+Underlying metrics:
+
+- `masterclass_http_requests_total`
+- `masterclass_predictions_total`
+- `masterclass_active_sessions`
+
+### Scenario 2: Authentication failure
+
+Goal:
+Generate an error on the gateway only.
+
+Shortcut:
 
 ```bash
-curl -i -s http://localhost:8080/api/classify \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"This request has no token."}'
+make demo-auth-failure
 ```
 
-Trigger ingress pressure:
+Underlying command:
+
+```bash
+curl -i -s http://localhost:8080/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"wrong-password"}'
+```
+
+Example output:
+
+```text
+HTTP/1.1 401 Unauthorized
+{"detail":"Invalid credentials"}
+```
+
+What changed operationally:
+
+- Gateway error traffic increased on `/auth/login`.
+- Model-service metrics stayed flat.
+
+How to explain it live:
+
+- This is a clean example of a failure that is visible in metrics and easy to localize.
+- Metrics already tell us where to look first: the auth path, not inference.
+
+Common learner confusion:
+
+- A correct rejection is still an error from a monitoring perspective because it changes the user experience.
+
+Expected dashboard focus:
+
+- gateway error rate
+- request count split by status code
+
+Underlying metrics:
+
+- `masterclass_http_requests_total{status="401"}`
+
+### Scenario 3: Ingress pressure
+
+Goal:
+Show that the edge can reject pressure before the services tell the full story.
+
+Shortcut:
+
+```bash
+make demo-burst
+```
+
+Underlying command:
 
 ```bash
 for _ in $(seq 1 12); do
@@ -126,9 +273,63 @@ for _ in $(seq 1 12); do
 done
 ```
 
-## What to Observe
+Example output:
 
-- Whether traffic appears on the gateway panels
-- Whether `401` and `429` responses appear in the error views
-- Whether latency increases on the gateway, the model service, or both
-- Whether the edge layer looks saturated before the services do
+```text
+200
+200
+200
+200
+503
+503
+503
+503
+503
+503
+503
+503
+```
+
+What changed operationally:
+
+- Edge traffic spiked.
+- In the verified local stack, the ingress rejects excess traffic with `503`.
+- Prometheus still shows NGINX-side signals even though not every request reaches the gateway.
+- The exact number of initial `200` responses can vary with recent traffic in the current rate-limit window.
+
+How to explain it live:
+
+- This demonstrates why monitoring the edge separately from the application matters.
+- Students should learn that symptoms at the edge can hide part of the application picture.
+
+Common learner confusion:
+
+- Some setups return `429` for throttling. This branch currently produces `503`, and the workshop should teach the system as it actually behaves.
+
+Expected dashboard focus:
+
+- ingress traffic spike
+- active NGINX connections
+- gateway in-progress requests
+
+Underlying metrics:
+
+- NGINX exporter metrics from `nginx-prometheus-exporter`
+- `masterclass_http_in_progress_requests`
+
+## Why Metrics Are Not Enough
+
+Metrics answer:
+
+- is traffic increasing?
+- are failures increasing?
+- is latency rising?
+- is the system under pressure?
+
+Metrics do not fully answer:
+
+- which individual request was slow?
+- why that exact request was slow?
+- what happened inside the gateway versus inside the model service?
+
+That is the transition to the observability branch: metrics are excellent at locating symptoms, but weak at reconstructing one request end to end.
