@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     password_salt: str = "masterclass-demo-salt"
     inference_delay_seconds: float = 0.0
     public_api_url: str = "http://localhost:8080"
+    grafana_public_url: str = "http://localhost:3000"
 
 
 @lru_cache

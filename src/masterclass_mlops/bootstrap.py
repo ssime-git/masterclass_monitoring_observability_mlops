@@ -6,7 +6,7 @@ from masterclass_mlops.database import Base
 from masterclass_mlops.repositories import UserRepository
 from masterclass_mlops.security import hash_password
 
-DEMO_USERS = ("alice", "bob")
+DEMO_USERS = ("alice", "bob", "admin")
 DEMO_PASSWORD = "mlops-demo"
 
 

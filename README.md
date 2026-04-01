@@ -62,6 +62,7 @@ Default demo users:
 
 - `alice / mlops-demo`
 - `bob / mlops-demo`
+- `admin / mlops-demo`
 
 ## Masterclass Manipulations
 
@@ -84,6 +85,8 @@ What to observe in Grafana:
 - request rate on the gateway
 - prediction activity by label
 - active sessions
+
+If you log in through Streamlit with `admin / mlops-demo`, the UI exposes an embedded monitoring cockpit with the Grafana dashboard directly inside the application.
 
 ### 2. Reproduce authentication errors
 

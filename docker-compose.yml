@@ -31,6 +31,7 @@ services:
       dockerfile: docker/Dockerfile.streamlit
     environment:
       PUBLIC_API_URL: http://nginx:8080
+      GRAFANA_PUBLIC_URL: http://localhost:3000
     depends_on:
       - nginx
     ports:
@@ -73,6 +74,9 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     ports:
       - "3000:3000"
     volumes:
