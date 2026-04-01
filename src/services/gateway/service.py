@@ -6,17 +6,17 @@ import httpx
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from masterclass_mlops.config import Settings
-from masterclass_mlops.metrics import ACTIVE_SESSIONS, PREDICTIONS_TOTAL
-from masterclass_mlops.models import SessionRecord, User
-from masterclass_mlops.repositories import PredictionRepository, SessionRepository, UserRepository
-from masterclass_mlops.schemas import (
+from shared.config import Settings
+from shared.metrics import ACTIVE_SESSIONS, PREDICTIONS_TOTAL
+from shared.models import SessionRecord, User
+from shared.repositories import PredictionRepository, SessionRepository, UserRepository
+from shared.schemas import (
     HistoryItem,
     LoginRequest,
     LoginResponse,
     ModelPredictionResponse,
 )
-from masterclass_mlops.security import expires_at_from_now, generate_session_token, hash_password
+from shared.security import expires_at_from_now, generate_session_token, hash_password
 
 
 def authenticate_user(db_session: Session, request: LoginRequest, settings: Settings) -> User:

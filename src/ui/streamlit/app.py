@@ -4,11 +4,11 @@ from typing import cast
 from urllib.parse import urlencode
 
 import requests
+
 import streamlit as st
 import streamlit.components.v1 as components
-
-from masterclass_mlops.config import get_settings
-from masterclass_mlops.schemas import ClassifyResponse, LoginResponse
+from shared.config import get_settings
+from shared.schemas import ClassifyResponse, LoginResponse
 
 ADMIN_USERNAME = "admin"
 

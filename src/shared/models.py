@@ -5,8 +5,8 @@ from datetime import datetime
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from masterclass_mlops.database import Base
-from masterclass_mlops.security import utc_now
+from shared.database import Base
+from shared.security import utc_now
 
 
 class User(Base):
