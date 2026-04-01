@@ -3,7 +3,7 @@ from pathlib import Path
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from masterclass_mlops.config import Settings
+from shared.config import Settings
 
 
 class Base(DeclarativeBase):

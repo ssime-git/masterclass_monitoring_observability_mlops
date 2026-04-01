@@ -6,8 +6,8 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from masterclass_mlops.models import PredictionRecord, SessionRecord, User
-from masterclass_mlops.security import utc_now
+from shared.models import PredictionRecord, SessionRecord, User
+from shared.security import utc_now
 
 
 class UserRepository:

@@ -9,16 +9,16 @@ import uvicorn
 from fastapi import FastAPI, Request, Response
 from opentelemetry import propagate, trace
 
-from masterclass_mlops.config import Settings, get_settings
-from masterclass_mlops.metrics import PREDICTIONS_TOTAL, metrics_response, record_http_metrics
-from masterclass_mlops.model_logic import classify_document
-from masterclass_mlops.observability import (
+from shared.config import Settings, get_settings
+from shared.metrics import PREDICTIONS_TOTAL, metrics_response, record_http_metrics
+from shared.model_logic import classify_document
+from shared.observability import (
     bind_request_context,
     configure_logging,
     configure_tracing,
     reset_request_context,
 )
-from masterclass_mlops.schemas import (
+from shared.schemas import (
     HealthResponse,
     ModelPredictionRequest,
     ModelPredictionResponse,
@@ -109,7 +109,7 @@ def predict(payload: ModelPredictionRequest) -> ModelPredictionResponse:
 
 
 def main() -> None:
-    uvicorn.run("masterclass_mlops.model_service.app:app", host="0.0.0.0", port=8001, reload=False)
+    uvicorn.run("services.model_service.app:app", host="0.0.0.0", port=8001, reload=False)
 
 
 if __name__ == "__main__":

@@ -11,28 +11,28 @@ from fastapi import Depends, FastAPI, Request, Response, status
 from opentelemetry import propagate, trace
 from sqlalchemy.orm import Session
 
-from masterclass_mlops.bootstrap import initialize_database, seed_demo_users
-from masterclass_mlops.config import Settings, get_settings
-from masterclass_mlops.database import build_session_factory
-from masterclass_mlops.gateway.dependencies import get_current_session, get_db_session
-from masterclass_mlops.gateway.service import (
+from services.gateway.dependencies import get_current_session, get_db_session
+from services.gateway.service import (
     authenticate_user,
     create_login_response,
     logout,
     record_prediction,
     request_prediction,
 )
-from masterclass_mlops.metrics import ACTIVE_SESSIONS, metrics_response, record_http_metrics
-from masterclass_mlops.models import SessionRecord
-from masterclass_mlops.observability import (
+from shared.bootstrap import initialize_database, seed_demo_users
+from shared.config import Settings, get_settings
+from shared.database import build_session_factory
+from shared.metrics import ACTIVE_SESSIONS, metrics_response, record_http_metrics
+from shared.models import SessionRecord
+from shared.observability import (
     bind_request_context,
     configure_logging,
     configure_tracing,
     reset_request_context,
     update_request_context,
 )
-from masterclass_mlops.repositories import SessionRepository
-from masterclass_mlops.schemas import (
+from shared.repositories import SessionRepository
+from shared.schemas import (
     ClassifyResponse,
     HealthResponse,
     LoginRequest,
@@ -160,7 +160,7 @@ async def classify(
 
 
 def main() -> None:
-    uvicorn.run("masterclass_mlops.gateway.app:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("services.gateway.app:app", host="0.0.0.0", port=8000, reload=False)
 
 
 if __name__ == "__main__":

@@ -6,9 +6,9 @@ import requests
 
 import streamlit as st
 import streamlit.components.v1 as components
-from masterclass_mlops.config import get_settings
-from masterclass_mlops.schemas import ClassifyResponse, LoginResponse
-from masterclass_mlops.streamlit_ui.grafana import (
+from shared.config import get_settings
+from shared.schemas import ClassifyResponse, LoginResponse
+from ui.streamlit.grafana import (
     MONITORING_DASHBOARD_UID,
     OBSERVABILITY_DASHBOARD_UID,
     build_dashboard_url,

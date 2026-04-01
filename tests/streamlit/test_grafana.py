@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
 
-from masterclass_mlops.streamlit_ui.grafana import (
+from ui.streamlit.grafana import (
     DEFAULT_GRAFANA_RANGE,
     MONITORING_DASHBOARD_UID,
     build_dashboard_url,

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from masterclass_mlops.bootstrap import initialize_database, seed_demo_users
-from masterclass_mlops.database import build_session_factory
-from masterclass_mlops.repositories import SessionRepository, UserRepository
-from masterclass_mlops.security import expires_at_from_now, generate_session_token
+from shared.bootstrap import initialize_database, seed_demo_users
+from shared.database import build_session_factory
+from shared.repositories import SessionRepository, UserRepository
+from shared.security import expires_at_from_now, generate_session_token
 
 
 def test_session_persists_in_sqlite(settings) -> None:

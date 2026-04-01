@@ -8,9 +8,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from opentelemetry import trace
 from sqlalchemy.orm import Session
 
-from masterclass_mlops.models import SessionRecord
-from masterclass_mlops.observability import update_request_context
-from masterclass_mlops.repositories import SessionRepository
+from shared.models import SessionRecord
+from shared.observability import update_request_context
+from shared.repositories import SessionRepository
 
 bearer_scheme = HTTPBearer(auto_error=False)
 logger = logging.getLogger(__name__)
