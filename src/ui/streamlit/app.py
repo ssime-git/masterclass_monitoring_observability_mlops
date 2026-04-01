@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import cast
 
 import requests
-import streamlit as st
 
-from masterclass_mlops.config import get_settings
-from masterclass_mlops.schemas import ClassifyResponse, LoginResponse
+import streamlit as st
+from shared.config import get_settings
+from shared.schemas import ClassifyResponse, LoginResponse
 
 
 def login(api_url: str, username: str, password: str) -> LoginResponse:

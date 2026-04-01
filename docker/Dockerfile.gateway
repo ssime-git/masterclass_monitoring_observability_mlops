@@ -11,4 +11,4 @@ COPY README.md ./
 COPY src ./src
 RUN uv sync --no-dev
 
-CMD ["uv", "run", "python", "-m", "masterclass_mlops.gateway.app"]
+CMD ["uv", "run", "python", "-m", "services.gateway.app"]

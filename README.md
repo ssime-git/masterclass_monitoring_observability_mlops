@@ -11,7 +11,7 @@ This branch contains the base application used in the masterclass. It is the bra
 
 ## Model Used in This Branch
 
-The current classifier is a deterministic keyword-based model implemented in [src/masterclass_mlops/model_logic.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/masterclass_mlops/model_logic.py).
+The current classifier is a deterministic keyword-based model implemented in [src/shared/model_logic.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/shared/model_logic.py).
 
 It is not a trained statistical model. This keeps the branch focused on architecture and request flow.
 

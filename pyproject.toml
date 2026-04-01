@@ -29,7 +29,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/masterclass_mlops"]
+packages = ["src/shared", "src/services", "src/ui"]
 
 [tool.ruff]
 line-length = 100
@@ -59,4 +59,4 @@ python_version = "3.12"
 plugins = []
 strict = true
 mypy_path = "src"
-packages = ["masterclass_mlops"]
+packages = ["shared", "services", "ui"]

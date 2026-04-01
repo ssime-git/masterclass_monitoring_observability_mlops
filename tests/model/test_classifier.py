@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from masterclass_mlops.model_logic import classify_document
+from shared.model_logic import classify_document
 
 
 def test_classifier_routes_billing_messages() -> None:

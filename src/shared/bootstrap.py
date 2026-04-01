@@ -1,10 +1,10 @@
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from masterclass_mlops.config import Settings
-from masterclass_mlops.database import Base
-from masterclass_mlops.repositories import UserRepository
-from masterclass_mlops.security import hash_password
+from shared.config import Settings
+from shared.database import Base
+from shared.repositories import UserRepository
+from shared.security import hash_password
 
 DEMO_USERS = ("alice", "bob")
 DEMO_PASSWORD = "mlops-demo"

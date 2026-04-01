@@ -6,8 +6,8 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from masterclass_mlops.models import SessionRecord
-from masterclass_mlops.repositories import SessionRepository
+from shared.models import SessionRecord
+from shared.repositories import SessionRepository
 
 bearer_scheme = HTTPBearer(auto_error=False)
 

@@ -8,10 +8,10 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from masterclass_mlops.bootstrap import initialize_database, seed_demo_users
-from masterclass_mlops.config import Settings
-from masterclass_mlops.database import build_session_factory
-from masterclass_mlops.gateway.app import app
+from services.gateway.app import app
+from shared.bootstrap import initialize_database, seed_demo_users
+from shared.config import Settings
+from shared.database import build_session_factory
 
 
 class MockModelTransport(httpx.AsyncBaseTransport):
