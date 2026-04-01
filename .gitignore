@@ -10,6 +10,7 @@ __pycache__/
 data/*.db
 data/grafana/
 data/loki/
+data/prometheus/
 data/tempo/
 dist/
 build/

@@ -61,3 +61,8 @@ make up
 ```
 
 The architecture branch also provides [docs/architecture-base.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/architecture-base.md).
+
+The monitoring branch adds [docs/monitoring-prometheus-grafana.md](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docs/monitoring-prometheus-grafana.md) and exposes:
+
+- Grafana: `http://localhost:3000`
+- Prometheus: `http://localhost:9090`
