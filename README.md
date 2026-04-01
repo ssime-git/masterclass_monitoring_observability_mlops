@@ -40,6 +40,35 @@ The workshop is designed for learners who already know the basics of:
 2. Move to `02-monitoring-prometheus-grafana` to answer: "What is happening in the system?"
 3. Move to `03-observability-otel` to answer: "Why is it happening?"
 
+## Target Architecture
+
+```mermaid
+flowchart LR
+    User["Learner Browser"] --> UI["Streamlit UI"]
+    UI --> NGINX["NGINX Reverse Proxy<br/>Rate Limiting"]
+    NGINX --> Gateway["FastAPI Gateway<br/>Auth and Session Validation"]
+    Gateway --> SQLite[("SQLite<br/>users, sessions, history")]
+    Gateway --> Model["FastAPI Model Service<br/>Document Classification"]
+
+    Prometheus["Prometheus"] --> Gateway
+    Prometheus --> Model
+    Prometheus --> NginxExporter["NGINX Exporter"]
+    NginxExporter --> NGINX
+
+    Grafana["Grafana"] --> Prometheus
+    Grafana --> Loki["Loki"]
+    Grafana --> Tempo["Tempo"]
+
+    Gateway --> OTel["OpenTelemetry Collector"]
+    Model --> OTel
+    OTel --> Tempo
+
+    Promtail["Promtail"] --> Loki
+    Gateway -. JSON logs .-> Promtail
+    Model -. JSON logs .-> Promtail
+    NGINX -. Access logs .-> Promtail
+```
+
 ## Teaching Notes
 
 - Keep the live session focused on a small number of components and dashboards.
