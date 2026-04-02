@@ -10,7 +10,7 @@ The question we answer here: **why is this happening?**
 
 The system still exposes the same login and classification flows, but each request now leaves more diagnostic evidence across services.
 
-## Correlation Flow
+## The Stack in One Picture
 
 ```mermaid
 flowchart LR
@@ -18,24 +18,113 @@ flowchart LR
     Nginx --> Gateway["gateway"]
     Gateway --> Model["model-service"]
 
-    Gateway -. "JSON logs: request_id, trace_id, session_id" .-> Loki["Loki"]
-    Model -. "JSON logs: request_id, trace_id, session_id" .-> Loki
-    Nginx -. "Access logs: ingress request_id" .-> Loki
+    Gateway -. "structured JSON logs" .-> LogFiles["log files in data/logs/"]
+    Model -. "structured JSON logs" .-> LogFiles
+    Nginx -. "access logs" .-> LogFiles
 
-    Gateway --> OTel["OTel Collector"]
-    Model --> OTel
-    OTel --> Tempo["Tempo"]
+    LogFiles --> Promtail["Promtail"]
+    Promtail --> Loki["Loki"]
+
+    Gateway -. "trace spans via OTLP HTTP" .-> Collector["OpenTelemetry Collector"]
+    Model -. "trace spans via OTLP HTTP" .-> Collector
+    Collector --> Tempo["Tempo"]
 
     Grafana["Grafana"] --> Loki
     Grafana --> Tempo
+    Streamlit["Streamlit admin cockpit"] --> Grafana
 ```
 
-Use this diagram to explain the observability split:
+This is the simplest way to describe the branch:
 
-- the response header gives the first correlation handle: `x-request-id`
-- gateway and model-service logs keep the same application request context
-- traces give timing structure
-- NGINX logs still help, but ingress correlation is not fully unified yet
+- the application still runs through `NGINX -> gateway -> model-service`
+- logs are written to files first, then shipped by Promtail into Loki
+- traces are emitted by the Python services to the OpenTelemetry Collector, then stored in Tempo
+- Grafana reads Loki and Tempo
+- Streamlit embeds the monitoring and observability dashboards for the admin demo
+
+## Component Cheat Sheet
+
+| Component | What it is | What it stores or forwards | Where you use it in the demo |
+| --- | --- | --- | --- |
+| OpenTelemetry | A standard for instrumentation | Trace context, spans, and propagation headers | Inside `gateway` and `model-service` code |
+| OpenTelemetry Collector | A small pipeline service | Receives spans from apps, batches them, forwards them | Between the apps and Tempo |
+| Tempo | A trace backend | Distributed traces and span trees | To inspect timing and request structure |
+| Promtail | A log shipper | Reads local log files and pushes them to Loki | Between `data/logs/` and Loki |
+| Loki | A log backend | Structured logs with labels | To search by `request_id`, `trace_id`, `status`, or `service` |
+| Grafana | The investigation UI | Reads metrics, logs, and traces from other systems | To pivot between dashboards, logs, and traces |
+
+## What Each Piece Means in Plain Language
+
+- **OpenTelemetry**
+  - This is not a storage system.
+  - It is the instrumentation language the services use to say: "a request started here, then this span happened, then that downstream call happened."
+  - In this repository, OpenTelemetry is used in the Python services to create spans and propagate trace context.
+
+- **OpenTelemetry Collector**
+  - Think of it as a relay for telemetry.
+  - The apps send spans to the collector at `http://otel-collector:4318`.
+  - The collector batches and forwards them to Tempo.
+  - In this repo, the trace pipeline is defined in [collector.yaml](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docker/otel/collector.yaml#L1).
+
+- **Tempo**
+  - Tempo is where traces are stored.
+  - If you want to see a trace tree, a parent span, child spans, and where time was spent, Tempo is the backend that answers that.
+  - In Grafana, Tempo is the trace datasource behind the `Recent Tempo Traces` section and trace exploration.
+
+- **Promtail**
+  - Promtail reads log files from disk and pushes them to Loki.
+  - It also extracts useful labels such as `request_id`, `trace_id`, and `status`.
+  - In this repo, Promtail reads files under `data/logs/` and forwards them to Loki.
+
+- **Loki**
+  - Loki stores logs and makes them searchable.
+  - If you want to ask "show me all gateway logs for this request id" or "show me all NGINX `503` login rejections", Loki is the backend that answers that.
+
+- **Grafana**
+  - Grafana is not where logs or traces are stored.
+  - It is the UI that queries Loki and Tempo and shows the results side by side.
+  - This is why the observability dashboard can show raw NGINX logs, application logs, and a derived blocked-login panel in one place.
+
+## Where the Data Goes in This Repo
+
+### Traces
+
+1. `gateway` and `model-service` create spans with OpenTelemetry.
+2. Both services send those spans to `otel-collector` using OTLP HTTP.
+3. The collector forwards the spans to Tempo.
+4. Grafana reads Tempo to display trace trees and search results.
+
+Code and config:
+
+- Trace setup in [observability.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/shared/observability.py#L142)
+- Collector pipeline in [collector.yaml](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docker/otel/collector.yaml#L1)
+- Tempo storage in [tempo.yaml](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docker/tempo/tempo.yaml#L1)
+
+### Logs
+
+1. `gateway` and `model-service` write structured JSON logs.
+2. `NGINX` writes JSON access logs.
+3. Promtail tails those log files from `data/logs/`.
+4. Promtail extracts labels and pushes the logs into Loki.
+5. Grafana queries Loki for raw logs and log-derived panels.
+
+Code and config:
+
+- JSON log format in [observability.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/shared/observability.py#L82)
+- NGINX log format in [nginx.conf](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docker/nginx/nginx.conf#L4)
+- Promtail pipelines in [promtail.yaml](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docker/promtail/promtail.yaml#L1)
+
+## Quick Mental Model
+
+- Metrics answer: "something changed"
+- Logs answer: "what exactly happened"
+- Traces answer: "where the time went"
+
+When teaching this branch, the easiest explanation is:
+
+1. Prometheus already told us the system changed.
+2. Loki lets us search the exact request and exact rejection events.
+3. Tempo lets us see the timing breakdown inside accepted requests.
 
 ## Observability Scope
 
@@ -76,6 +165,26 @@ At a high level:
 6. NGINX also logs the request, but currently with its own ingress-generated request ID.
 
 This is enough for strong app-level correlation, even if ingress-level continuity is not yet complete.
+
+## Useful Commands Before the Scenarios
+
+Start or rebuild the full local stack:
+
+```bash
+make up
+```
+
+Check that the main services are ready:
+
+```bash
+make demo-ready
+```
+
+Check that Prometheus and Grafana see the expected backends:
+
+```bash
+make demo-backends
+```
 
 ## Standard Investigation Flow
 
@@ -193,7 +302,7 @@ Common learner confusion:
 ### Scenario 3: Correlate the slower request in gateway and model-service logs
 
 Goal:
-Find the same request in both services and show shared `request_id`, `session_id`, and `trace_id`.
+Run the real three-pillar investigation flow from one slow request.
 
 Shortcut:
 
@@ -201,32 +310,57 @@ Shortcut:
 make demo-correlate
 ```
 
-Underlying commands:
+What `make demo-correlate` does now:
 
 ```bash
-REQUEST_ID="1r59MPi1pEQ"
-
-rg -n "$REQUEST_ID" data/logs/gateway.log data/logs/model-service.log
+1. reads the latest request id from data/logs/demo-last-request-id.txt
+2. finds matching gateway and model-service logs
+3. extracts the trace id
+4. queries Tempo for the span breakdown
+5. queries Prometheus for p95 confirmation
 ```
 
 Example output:
 
 ```text
-data/logs/model-service.log:7:{"timestamp":"2026-04-01T18:54:37.671663+00:00","message":"prediction_completed","service":"model-service","request_id":"1r59MPi1pEQ","session_id":"9","trace_id":"307026916f251c54ece9bec9c8328dad","slow_path":true}
-data/logs/gateway.log:33:{"timestamp":"2026-04-01T18:54:37.677076+00:00","message":"HTTP Request: POST http://model-service:8001/predict \"HTTP/1.1 200 OK\"","service":"gateway","request_id":"1r59MPi1pEQ","session_id":"9","trace_id":"307026916f251c54ece9bec9c8328dad"}
-data/logs/gateway.log:35:{"timestamp":"2026-04-01T18:54:37.691591+00:00","message":"prediction_recorded","service":"gateway","request_id":"1r59MPi1pEQ","session_id":9,"trace_id":"307026916f251c54ece9bec9c8328dad","label":"account"}
+=== Step 1: Find the request in structured logs (Loki) ===
+REQUEST_ID=1r59MPi1pEQ
+
+09:04:23.671  model-service   prediction_completed
+09:04:23.675  gateway         HTTP Request: POST http://model-service:
+09:04:23.676  gateway         model_service_response_received
+09:04:23.687  gateway         prediction_recorded
+
+=== Step 2: Follow the trace in Tempo ===
+TRACE_ID=307026916f251c54ece9bec9c8328dad
+
+Span breakdown (queried from Tempo):
+Span                                       Duration
+----------------------------------------------------
+POST /api/classify                          386.0 ms
+gateway.session_lookup                        1.5 ms
+gateway.forward_prediction                  370.0 ms
+POST /predict                               358.5 ms
+model.inference                             355.8 ms
+model.keyword_scoring                         0.1 ms
+gateway.store_prediction_history             11.5 ms
+
+=== Step 3: Confirm with Prometheus metrics ===
+Gateway /api/classify p95:       0.475 s
+Model-service /predict p95:      0.475 s
 ```
 
 What changed operationally:
 
-- The application tier is strongly correlated.
-- The same request can be followed across services with shared identifiers.
-- `make demo-slow` stores the latest request id in `data/logs/demo-last-request-id.txt`, so `make demo-correlate` can replay the search without manual copy and paste.
+- One command now walks the same incident through logs, traces, and metrics.
+- `make demo-slow` stores the latest request id in `data/logs/demo-last-request-id.txt`, so `make demo-correlate` can replay the investigation without manual copy and paste.
 
 How to explain it live:
 
-- This is the main payoff of structured logs and distributed tracing.
-- You can now move from a symptom to a concrete request narrative.
+- This is the main payoff of the observability stack.
+- Loki tells you which request to inspect.
+- Tempo tells you where time was spent.
+- Prometheus tells you whether the slow request is isolated or part of a broader pattern.
 
 Common learner confusion:
 
