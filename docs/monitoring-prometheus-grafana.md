@@ -53,30 +53,159 @@ Then read the dashboard in this order:
 3. Latency: is slowdown visible on the gateway, the model service, or both?
 4. Saturation: is the edge or the application under pressure first?
 
-This reading order gives students a repeatable investigation habit.
+This reading order gives a repeatable investigation habit.
 
 ## What Each Metric Means
 
-- `masterclass_http_requests_total`
-  - Counts requests by `service`, `method`, `path`, and `status`.
-  - Use it to explain traffic shape and to separate healthy calls from errors.
+| Metric | Purpose |
+|--------|---------|
+| `masterclass_http_requests_total` | Counts requests by `service`, `method`, `path`, and `status`. Use it to explain traffic shape and to separate healthy calls from errors. |
+| `masterclass_http_request_duration_seconds` | Histogram of request latency by `service`, `method`, and `path`. Use it to explain `p50` and `p95`. `p50` shows the common case; `p95` shows the slower tail. |
+| `masterclass_http_in_progress_requests` | Number of requests currently being processed by a service. Use it to discuss pressure, concurrency, and work in flight. |
+| `masterclass_active_sessions` | Number of non-expired sessions tracked by the gateway. Use it to connect authentication activity with user state. |
+| `masterclass_predictions_total` | Number of predictions by `service` and `label`. Use it to link monitoring to user-facing ML behavior. |
 
-- `masterclass_http_request_duration_seconds`
-  - Histogram of request latency by `service`, `method`, and `path`.
-  - Use it to explain `p50` and `p95`.
-  - `p50` shows the common case; `p95` shows the slower tail.
+## Understanding `p95` Without Jargon
 
-- `masterclass_http_in_progress_requests`
-  - Number of requests currently being processed by a service.
-  - Use it to discuss pressure, concurrency, and work in flight.
+The `Latency p95` panel is often the hardest one to read at first, so it helps to keep one simple idea in mind:
 
-- `masterclass_active_sessions`
-  - Number of non-expired sessions tracked by the gateway.
-  - Use it to connect authentication activity with user state.
+- `p95` means: "95% of requests were faster than this value"
+- the remaining `5%` were slower
 
-- `masterclass_predictions_total`
-  - Number of predictions by `service` and `label`.
-  - Use it to link monitoring to user-facing ML behavior.
+So if the dashboard shows:
+
+- `gateway p95 = 0.40 s`
+
+it means:
+
+- most requests finished in less than `400 ms`
+- only a small slower tail took longer than that
+
+This is useful because averages can hide bad user experience.
+
+Example:
+
+- 9 requests take `50 ms`
+- 1 request takes `900 ms`
+
+The average is still fairly small, but one real user had a slow request. `p95` is designed to make that slower tail visible.
+
+### Why `p95` Is More Useful Than "Average Latency"
+
+When people say "the system feels slow", they usually do not mean every request is slow.
+They usually mean:
+
+- most requests are fine
+- some requests are much slower
+- those slower requests matter
+
+That is exactly what `p95` helps reveal.
+
+In this repository:
+
+- `p50` would describe the middle of the distribution, the common case
+- `p95` describes the slower edge of normal user experience
+
+So the teaching shortcut is:
+
+- `p50` answers: "what usually happens?"
+- `p95` answers: "how bad is the slow tail getting?"
+
+## How `p95` Is Built in This Codebase
+
+There are three steps:
+
+1. the Python services measure request duration
+2. Prometheus stores those durations in histogram buckets
+3. Grafana computes `p95` from those buckets
+
+### Step 1: Python measures request duration
+
+The latency measurement starts in [metrics.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/shared/metrics.py#L36).
+
+That function:
+
+- starts a timer before the request is handled
+- stops the timer after the response is produced
+- records the duration with `HTTP_REQUEST_DURATION_SECONDS.observe(duration)`
+
+The important line is in [metrics.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/shared/metrics.py#L57):
+
+```python
+HTTP_REQUEST_DURATION_SECONDS.labels(
+    service=service_name,
+    method=method,
+    path=path,
+).observe(duration)
+```
+
+That is the moment where one request duration is added to the latency histogram.
+
+### Step 2: The middleware runs for each request
+
+The latency recorder is attached as middleware in both services:
+
+- gateway: [app.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/services/gateway/app.py#L103)
+- model-service: [app.py](/Users/seb/Documents/masterclass_monitoring_observability_mlops/src/services/model_service/app.py#L68)
+
+This means every HTTP request handled by those services can contribute to:
+
+- request counts
+- in-progress gauges
+- latency histograms
+
+### Step 3: Grafana computes `p95`
+
+Grafana does not receive a ready-made `p95` value from Python.
+It computes it from Prometheus histogram buckets.
+
+The panel query is defined in [api-golden-signals.json](/Users/seb/Documents/masterclass_monitoring_observability_mlops/docker/grafana/provisioning/dashboards/api-golden-signals.json#L145):
+
+```text
+histogram_quantile(
+  0.95,
+  sum(rate(masterclass_http_request_duration_seconds_bucket{service="gateway",path="/api/classify"}[5m])) by (le)
+)
+```
+
+Read it like this:
+
+- `masterclass_http_request_duration_seconds_bucket`
+  - the histogram buckets produced by Python
+- `rate(...[5m])`
+  - how those buckets are changing over the last 5 minutes
+- `sum(... by (le))`
+  - combine matching series while keeping the bucket boundary label `le`
+- `histogram_quantile(0.95, ...)`
+  - estimate the 95th percentile
+
+So `p95` is not magic. It is just:
+
+- measured durations in Python
+- stored as histogram buckets in Prometheus
+- transformed into a percentile in Grafana
+
+## How to Explain a `p95` Spike
+
+When the `Latency p95` panel goes up, it does **not** mean:
+
+- every request got slower
+
+It means:
+
+- the slowest part of the request distribution got worse
+
+That is why the slow demo is useful:
+
+- one healthy classify request does not move the panel much
+- repeated slow requests push the slower tail up
+- the panel then shows that the route is degrading from the user point of view
+
+In practice:
+
+- if `gateway p95` rises and `model-service p95` rises too, the slowdown is likely downstream as well
+- if only the gateway rises, the issue may be before or around the gateway layer
+- if neither rises, one slow request may just be noise rather than a pattern
 
 ## Verified Raw Entry Points
 
