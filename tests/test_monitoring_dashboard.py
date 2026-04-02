@@ -12,21 +12,18 @@ def test_monitoring_dashboard_includes_edge_vs_gateway_panel() -> None:
     )
 
     panel = next(
-        item for item in dashboard["panels"] if item["title"] == "Edge vs Accepted Login Traffic"
+        item
+        for item in dashboard["panels"]
+        if item["title"] == "Accepted Login Requests per Minute"
     )
 
-    assert "Exact blocked counts are not available on this branch" in panel["description"]
+    assert "does not expose exact blocked-request counts" in panel["description"]
     assert panel["targets"] == [
         {
-            "expr": "rate(nginx_http_requests_total[1m])",
-            "legendFormat": "nginx edge requests",
-            "refId": "A",
-        },
-        {
             "expr": (
-                'sum(rate(masterclass_http_requests_total{service="gateway",path="/auth/login"}[1m]))'
+                'sum(increase(masterclass_http_requests_total{service="gateway",path="/auth/login"}[1m]))'
             ),
-            "legendFormat": "gateway accepted login requests",
-            "refId": "B",
+            "legendFormat": "accepted login requests per minute",
+            "refId": "A",
         },
     ]

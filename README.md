@@ -229,10 +229,10 @@ make demo-burst
 
 - NGINX active connections spike
 - Some requests succeed, then `503` errors appear
-- The `Edge vs Accepted Login Traffic` panel is a signal, not an exact blocked-request counter
+- The `Accepted Login Requests per Minute` panel shows only the requests that reached the gateway
 - The gateway did not see all 12 requests because NGINX blocked most of them
 
-On this branch, the new panel helps you see that the edge and the application are telling different stories: ingress activity is rising, but accepted gateway login traffic stays lower. That is enough to flag an edge-side problem, but not enough to count blocked requests exactly.
+On this branch, the panel helps you see how many login requests were actually accepted by the application during each minute. It does not count the requests rejected by NGINX.
 
 **Key takeaway:** Monitoring covers multiple layers. Some problems happen before requests reach your application. If you only look at application metrics, you will miss edge-level failures entirely. Exact blocked-request counts come in the next branch, where logs and traces are added.
 

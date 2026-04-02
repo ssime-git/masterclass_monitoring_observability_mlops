@@ -303,13 +303,13 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "A gap between edge request rate and gateway login throughput suggests ingress throttling. Exact blocked counts are not available on this branch because the NGINX exporter does not label requests by status code.",
+      "description": "Accepted login requests per minute observed by the gateway. This branch does not expose exact blocked-request counts at the NGINX layer.",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "reqps"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -334,17 +334,12 @@
       },
       "targets": [
         {
-          "expr": "rate(nginx_http_requests_total[1m])",
-          "legendFormat": "nginx edge requests",
+          "expr": "sum(increase(masterclass_http_requests_total{service=\"gateway\",path=\"/auth/login\"}[1m]))",
+          "legendFormat": "accepted login requests per minute",
           "refId": "A"
-        },
-        {
-          "expr": "sum(rate(masterclass_http_requests_total{service=\"gateway\",path=\"/auth/login\"}[1m]))",
-          "legendFormat": "gateway accepted login requests",
-          "refId": "B"
         }
       ],
-      "title": "Edge vs Accepted Login Traffic",
+      "title": "Accepted Login Requests per Minute",
       "type": "timeseries"
     }
   ],

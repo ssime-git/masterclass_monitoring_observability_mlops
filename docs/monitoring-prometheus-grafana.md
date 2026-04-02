@@ -307,7 +307,7 @@ Common learner confusion:
 Expected dashboard focus:
 
 - ingress traffic spike
-- edge request rate rising faster than accepted login traffic
+- accepted login requests per minute on the gateway
 - active NGINX connections
 - gateway in-progress requests
 
@@ -315,12 +315,12 @@ Underlying metrics:
 
 - NGINX exporter metrics from `nginx-prometheus-exporter`
 - `masterclass_http_in_progress_requests`
-- gateway login throughput from `masterclass_http_requests_total`
+- accepted gateway login traffic from `masterclass_http_requests_total`
 
 Important limitation on this branch:
 
-- The dashboard can highlight an ingress-versus-application gap, but it cannot show an exact blocked-request count.
-- The bundled NGINX exporter here exposes total request volume, not per-status counters such as `503`.
+- The dashboard can show accepted login traffic, but it cannot show an exact blocked-request count.
+- The bundled NGINX exporter here does not provide the per-status or per-route edge counters needed to compute blocked `503` requests.
 
 ## Why Metrics Are Not Enough
 
