@@ -167,7 +167,16 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "Requests rejected by the NGINX rate limiter before they reach the gateway.",
+      "description": "Blocked /auth/login requests per minute derived from NGINX access logs in Loki.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -176,24 +185,26 @@
       },
       "id": 6,
       "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
       "targets": [
         {
-          "expr": "{service=\"nginx\"} |= \"\\\"request_uri\\\":\\\"/auth/login\\\"\" |= \"\\\"status\\\":503\"",
+          "expr": "sum(count_over_time({service=\"nginx\"} |= \"\\\"request_uri\\\":\\\"/auth/login\\\"\" |= \"\\\"status\\\":503\"[1m]))",
+          "legendFormat": "blocked /auth/login 503 per minute",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Rate-Limited Login Requests",
-      "type": "logs"
+      "title": "Blocked Login Requests per Minute",
+      "type": "timeseries"
     },
     {
       "gridPos": {

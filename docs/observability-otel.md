@@ -317,7 +317,7 @@ What changed operationally:
 How to explain it live:
 
 - Slow classify and blocked login are different investigation patterns.
-- The `Rate-Limited Login Requests` panel in the Observability Overview dashboard shows the exact rejected NGINX entries.
+- The `Blocked Login Requests per Minute` panel in the Observability Overview dashboard counts rejected `503` logins from Loki.
 - Logs and traces are useful, but you still need the edge story.
 
 ## Why Logs and Traces Complement Metrics

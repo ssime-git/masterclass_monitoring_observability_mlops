@@ -53,18 +53,21 @@ def test_observability_dashboard_includes_rate_limited_nginx_panel() -> None:
     )
 
     panel = next(
-        item for item in dashboard["panels"] if item["title"] == "Rate-Limited Login Requests"
+        item
+        for item in dashboard["panels"]
+        if item["title"] == "Blocked Login Requests per Minute"
     )
 
     assert panel["description"] == (
-        "Requests rejected by the NGINX rate limiter before they reach the gateway."
+        "Blocked /auth/login requests per minute derived from NGINX access logs in Loki."
     )
     assert panel["targets"] == [
         {
             "expr": (
-                '{service="nginx"} |= "\\"request_uri\\":\\"/auth/login\\"" '
-                '|= "\\"status\\":503"'
+                'sum(count_over_time({service="nginx"} |= "\\"request_uri\\":\\"/auth/login\\"" '
+                '|= "\\"status\\":503"[1m]))'
             ),
+            "legendFormat": "blocked /auth/login 503 per minute",
             "queryType": "range",
             "refId": "A",
         }

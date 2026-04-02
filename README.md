@@ -336,10 +336,10 @@ make demo-burst
 
 - The first requests return `200`, then the rest return `503`
 - In the Grafana monitoring dashboard, you can see the traffic spike and the error rate going up
-- In the Grafana observability dashboard, the `Rate-Limited Login Requests` panel shows the exact rejected NGINX entries for `/auth/login`
+- In the Grafana observability dashboard, the `Blocked Login Requests per Minute` panel shows the rejected `503` login volume derived from NGINX logs in Loki
 - In the application logs, there is no trace of the rejected requests because they were stopped at NGINX before reaching the gateway
 
-**Key takeaway:** Monitoring and observability work at different layers. The monitoring dashboard gives you the signal that ingress and application traffic disagree. The observability dashboard then shows the exact rejected edge requests. A slow model response and a rate-limited burst are two completely different problems, and you need different tools to investigate each one.
+**Key takeaway:** Monitoring and observability work at different layers. The monitoring dashboard shows how many login requests were accepted by the application. The observability dashboard then counts the rejected edge requests from logs. A slow model response and a rate-limited burst are two completely different problems, and you need different tools to investigate each one.
 
 <details>
 <summary>Underlying commands and example output</summary>
