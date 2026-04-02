@@ -161,6 +161,23 @@
       ],
       "title": "NGINX Access Logs",
       "type": "logs"
+    },
+    {
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 5,
+      "options": {
+        "content": "Tempo trace search is rendered directly in Streamlit in this demo. Grafana 11.6 dashboard queries do not support Tempo search query types in this stack, so the live trace list appears above this embedded dashboard.",
+        "mode": "markdown"
+      },
+      "targets": [],
+      "title": "Distributed Traces (Tempo)",
+      "description": "Use the native Streamlit trace list above to open recent Tempo traces in Grafana Explore.",
+      "type": "text"
     }
   ],
   "refresh": "5s",

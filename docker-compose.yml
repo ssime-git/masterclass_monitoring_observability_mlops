@@ -46,10 +46,13 @@ services:
     environment:
       PUBLIC_API_URL: http://nginx:8080
       GRAFANA_PUBLIC_URL: http://localhost:3000
+      TEMPO_API_URL: http://tempo:3200
     depends_on:
       - nginx
     ports:
       - "8501:8501"
+    volumes:
+      - ./src:/app/src:ro
 
   nginx:
     image: nginx:1.27-alpine
@@ -94,11 +97,12 @@ services:
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
     ports:
       - "3000:3000"
     volumes:
       - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./data/grafana:/var/lib/grafana
+      - ./data/grafana/grafana.db:/var/lib/grafana/grafana.db
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.123.0

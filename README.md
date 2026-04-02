@@ -161,7 +161,7 @@ This logs in as a demo user and sends a short text to the classification endpoin
 
 **What to observe in the response:**
 
-- The response comes back with status `200` and a very short processing time (around `0.05 ms`)
+- The response comes back with status `200` and a very short processing time (typically `0.3 - 0.8 ms`)
 - The response header contains an `x-request-id`. This identifier is the first tool observability gives you: a way to find this specific request later in logs and traces
 
 **Key takeaway:** Everything looks fine. The system is healthy. Remember this baseline for the next step.
@@ -170,35 +170,23 @@ This logs in as a demo user and sends a short text to the classification endpoin
 <summary>Underlying commands and example output</summary>
 
 ```bash
-LOGIN="$(curl -i -s http://localhost:8080/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"mlops-demo"}')"
-
-TOKEN="$(printf '%s' "${LOGIN}" | tail -n 1 \
-  | python3 -c 'import sys, json; print(json.load(sys.stdin)["access_token"])')"
-
-sleep 2
-
-curl -i -s http://localhost:8080/api/classify \
-  -H "Authorization: Bearer ${TOKEN}" \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"Refund please."}'
+# See the Makefile
 ```
 
 ```text
 HTTP/1.1 200 OK
 Server: nginx/1.27.5
 Content-Type: application/json
-x-request-id: ztWg3aTI4AA
+x-request-id: nJy2nH-nZgg
 
-{"result":{"label":"billing","confidence":0.65,"processing_time_ms":0.05241700000624405},"history":[{"text":"Refund please.","predicted_label":"billing","confidence":0.65,"created_at":"2026-04-01T18:54:37.321445"}]}
+{"result":{"label":"billing","confidence":0.65,"processing_time_ms":0.14573299995390698},"history":[{"text":"Refund please.","predicted_label":"billing","confidence":0.65,"created_at":"2026-04-02T09:04:15.090027"}]}
 ```
 
 </details>
 
 ### 2. Trigger a slow request and notice the difference
 
-**Why this step matters:** This is the core teaching moment. We send a longer text that triggers a slower code path in the model. The response is still `200 OK`, the prediction is still correct, but it took **7000 times longer**. Without monitoring, nobody would notice. The user got an answer, but the experience was degraded.
+**Why this step matters:** This is the core teaching moment. We send a text that triggers a slower code path in the model. The response is still `200 OK`, the prediction is still correct, but it took **roughly 2000 times longer**. Without monitoring, nobody would notice. The user got an answer, but the experience was degraded.
 
 This is where **monitoring** starts to shine: the Grafana dashboard will show a latency spike on the classify endpoint. You can see that something changed.
 
@@ -210,7 +198,7 @@ make demo-slow
 
 **What to observe:**
 
-- The response is still `200`, but `processing_time_ms` jumped from `0.05 ms` to roughly `353 ms`
+- The response is still `200`, but `processing_time_ms` jumped from `~0.15 ms` to roughly `355 ms`
 - In Grafana, the latency panel shows a clear spike compared to the previous request
 - A successful response does not always mean the system is healthy
 
@@ -236,53 +224,99 @@ curl -i -s http://localhost:8080/api/classify \
 ```
 
 ```text
-HTTP/1.1 200 OK
-Server: nginx/1.27.5
-Content-Type: application/json
-x-request-id: 1r59MPi1pEQ
-
-{"result":{"label":"account","confidence":0.8500000000000001,"processing_time_ms":353.25243300030706},"history":[{"text":"My account login has latency issues after the password reset.","predicted_label":"account","confidence":0.8500000000000001,"created_at":"2026-04-01T18:54:37.681423"}]}
+Span breakdown (queried from Tempo):
+Span                                       Duration
+----------------------------------------------------
+POST /api/classify                          381.4 ms
+gateway.session_lookup                        2.2 ms
+gateway.forward_prediction                  364.4 ms
+POST /predict                               357.0 ms
+model.inference                             354.1 ms
+model.keyword_scoring                         0.1 ms
+gateway.store_prediction_history             10.1 ms
 ```
 
 </details>
 
-### 3. Follow the slow request across services using logs
+### 3. Investigate the slow request using the three observability pillars
 
-**Why this step matters:** This is the step where observability proves its value. Using the `x-request-id` from the slow response, we search the logs of both services. Because each service writes structured logs with shared identifiers (`request_id`, `session_id`, `trace_id`), we can follow the exact journey of that one slow request across the gateway and the model service.
-
-This is something monitoring alone cannot do. Metrics tell you "latency went up on the classify route." Logs tell you "this specific request, sent by this user, in this session, triggered the slow path in the model."
+**Why this step matters:** Monitoring told us "latency went up." Now we need to find out **which** request caused it, **where** the time was spent, and **why** it was slow. This is where the three observability pillars work together: logs, traces, and metrics.
 
 ```bash
 make demo-correlate
 ```
 
-**What to observe:**
+This command runs three investigation steps automatically against the live system:
 
-- The same `request_id` appears in both the gateway logs and the model-service logs
-- The logs also share a `trace_id`, which links to the distributed trace in Tempo
-- The model-service log shows `"slow_path": true`, which explains why this request was slow
-- NGINX also logged the request, but with a different `request_id` (the ingress and application layers do not yet share identifiers end to end)
+**Step 1 — Logs (Loki): find the request across services**
 
-**Key takeaway:** Structured logs with shared identifiers let you reconstruct the full story of a single request across multiple services. That is the difference between knowing "something is slow" (monitoring) and knowing "this request was slow because it hit the model slow path" (observability).
-
-<details>
-<summary>Underlying commands and example output</summary>
-
-```bash
-REQUEST_ID="1r59MPi1pEQ"
-
-rg -n "$REQUEST_ID" data/logs/gateway.log data/logs/model-service.log
-
-tail -n 6 data/logs/nginx/access.log
-```
+Using the `x-request-id` from the slow response, we search the structured logs of both services. Because each log entry contains `request_id`, `trace_id`, and `session_id`, we can follow the exact journey of that one request.
 
 ```text
-data/logs/model-service.log:7:{"timestamp":"2026-04-01T18:54:37.671663+00:00","message":"prediction_completed","service":"model-service","request_id":"1r59MPi1pEQ","session_id":"9","trace_id":"307026916f251c54ece9bec9c8328dad","slow_path":true}
-data/logs/gateway.log:33:{"timestamp":"2026-04-01T18:54:37.677076+00:00","message":"HTTP Request: POST http://model-service:8001/predict \"HTTP/1.1 200 OK\"","service":"gateway","request_id":"1r59MPi1pEQ","session_id":"9","trace_id":"307026916f251c54ece9bec9c8328dad"}
-data/logs/gateway.log:35:{"timestamp":"2026-04-01T18:54:37.691591+00:00","message":"prediction_recorded","service":"gateway","request_id":"1r59MPi1pEQ","session_id":9,"trace_id":"307026916f251c54ece9bec9c8328dad","label":"account"}
+=== Step 1: Find the request in structured logs (Loki) ===
+REQUEST_ID=hoyiYePdWZE
 
-{"timestamp":"2026-04-01T18:54:37+00:00","service":"nginx","request_method":"POST","request_uri":"/api/classify","status":200,"request_time":0.408,"request_id":"d34cb267b41c7601651927f0b8ba59d4"}
+09:04:23.671  model-service   prediction_completed
+09:04:23.675  gateway         HTTP Request: POST http://model-service:
+09:04:23.676  gateway         model_service_response_received
+09:04:23.687  gateway         prediction_recorded
 ```
+
+The same `request_id` appears in both services. We can also extract the `trace_id` to dig deeper.
+
+**Step 2 — Traces (Tempo): find the bottleneck**
+
+Using the `trace_id` from the logs, we query Tempo to get the full span tree with timing per service. This is where you see **exactly where time was spent**:
+
+```text
+=== Step 2: Follow the trace in Tempo ===
+TRACE_ID=2f3e69c7e4b702d08c38456a638749be
+
+Span breakdown (queried from Tempo):
+Span                                       Duration
+----------------------------------------------------
+POST /api/classify                          386.0 ms
+gateway.session_lookup                        1.5 ms
+gateway.forward_prediction                  370.0 ms
+POST /predict                               358.5 ms
+model.inference                             355.8 ms  <-- BOTTLENECK
+model.keyword_scoring                         0.1 ms
+gateway.store_prediction_history             11.5 ms
+```
+
+Reading the trace:
+- Total request: **386 ms**
+- Gateway overhead (session lookup + store history): **13 ms**
+- Model service processing (`model.inference`): **355.8 ms** — this is the bottleneck
+- The actual keyword scoring inside the model: **0.1 ms** — the model logic itself is fast, but something else inside `model.inference` takes 355 ms
+
+The gateway is not responsible. The slowness is entirely inside the model service.
+
+You can also open this trace visually in Grafana at `http://localhost:3000` by going to Explore, selecting Tempo, and searching for the trace ID. The Observability Overview dashboard also has a Distributed Traces panel at the bottom.
+
+**Step 3 — Metrics (Prometheus): confirm the pattern**
+
+Finally, we check Prometheus to see if this is a one-off or a pattern:
+
+```text
+=== Step 3: Confirm with Prometheus metrics ===
+Gateway /api/classify p95:       0.475 s
+Model-service /predict p95:      0.475 s
+```
+
+The p95 latency for model-service is 475 ms. This confirms the slow request is not an outlier — it shifted the latency distribution.
+
+**Key takeaway:** Each tool answers a different question. Prometheus tells you "model-service latency is high." Tempo tells you "the `model.inference` span took 355 ms." Logs tell you "this specific request, from this user, in this session, hit the slow path." Together, you go from symptom to root cause.
+
+<details>
+<summary>Underlying commands</summary>
+
+`make demo-correlate` runs the following steps:
+
+1. Search structured logs with `jq` filtering by `request_id`
+2. Extract `trace_id` from the logs
+3. Query Tempo API via Grafana proxy to get the span tree
+4. Query Prometheus API for p95 latency histograms
 
 Note: `make demo-slow` stores the latest request id in `data/logs/demo-last-request-id.txt`, and `make demo-correlate` reuses it automatically.
 
@@ -386,8 +420,8 @@ Observability Overview observability-overview dash-db
 | Is something wrong? | Latency spike on the dashboard | - |
 | Which request caused it? | - | Search by `request_id` in logs |
 | What path did the request take? | - | Follow the `trace_id` across services |
-| Why was it slow? | - | Log shows `slow_path: true` |
-| Where was time spent? | - | Trace shows timing per service |
+| Why was it slow? | - | Trace shows `model.inference` span took 355 ms |
+| Where was time spent? | - | Trace span tree shows duration per service |
 | Was the failure in the app or at the edge? | Error rate went up | Logs show if the app or NGINX handled it |
 
 Monitoring tells you something is happening. Observability tells you why it is happening and where to look. In production MLOps, you need both.

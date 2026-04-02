@@ -11,4 +11,4 @@ COPY README.md ./
 COPY src ./src
 RUN uv sync --no-dev
 
-CMD ["uv", "run", "streamlit", "run", "src/ui/streamlit/app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true"]
+CMD ["uv", "run", "streamlit", "run", "src/ui/streamlit/app.py", "--server.address", "0.0.0.0", "--server.port", "8501", "--server.headless", "true", "--server.fileWatcherType", "poll"]

@@ -32,10 +32,10 @@ test-streamlit:
 	$(UV) run pytest tests/streamlit
 
 up:
-	docker compose up --build
+	docker compose up --build -d
 
 down:
-	docker compose down --remove-orphans
+	docker compose down -v --remove-orphans --rmi all
 
 demo-ready:
 	@for url in "$(API_BASE_URL)/health" "$(PROM_BASE_URL)/-/ready" "$(GRAFANA_BASE_URL)/api/health"; do \
@@ -79,10 +79,32 @@ demo-correlate:
 		echo "No request id available. Run 'make demo-slow' first or pass REQUEST_ID=<id>."; \
 		exit 1; \
 	fi; \
-	echo "Using REQUEST_ID=$${REQUEST_ID}"; \
-	rg -n "$${REQUEST_ID}" data/logs/gateway.log data/logs/model-service.log; \
+	echo "=== Step 1: Find the request in structured logs (Loki) ==="; \
+	echo "REQUEST_ID=$${REQUEST_ID}"; \
 	echo; \
-	tail -n 6 data/logs/nginx/access.log
+	jq -r "select(.request_id == \"$${REQUEST_ID}\") | \"\(.timestamp[11:23])  \(.service | if length < 14 then . + \" \" * (14 - length) else . end)  \(.message[0:40])\"" data/logs/model-service.log data/logs/gateway.log | sort; \
+	echo; \
+	TRACE_ID=$$(jq -r "select(.request_id == \"$${REQUEST_ID}\") | .trace_id" data/logs/model-service.log data/logs/gateway.log | head -1); \
+	echo "=== Step 2: Follow the trace in Tempo ==="; \
+	echo "TRACE_ID=$${TRACE_ID}"; \
+	echo "Open in Grafana: http://localhost:3000/explore?left={\"datasource\":\"tempo\",\"queries\":[{\"queryType\":\"traceql\",\"query\":\"$${TRACE_ID}\"}]}"; \
+	echo; \
+	echo "Span breakdown (queried from Tempo):"; \
+	curl -s "http://localhost:3000/api/datasources/proxy/uid/tempo/api/traces/$${TRACE_ID}" | python3 -c "\
+import json, sys; \
+data = json.load(sys.stdin); \
+spans = []; \
+[spans.append((int(s['startTimeUnixNano']), s['name'], (int(s['endTimeUnixNano']) - int(s['startTimeUnixNano'])) / 1_000_000)) for b in data['batches'] for sc in b['scopeSpans'] for s in sc['spans']]; \
+spans.sort(); \
+print(f\"{'Span':<40} {'Duration':>10}\"); \
+print('-' * 52); \
+[print(f'{n:<40} {d:>8.1f} ms') for _, n, d in spans]"; \
+	echo; \
+	echo "=== Step 3: Confirm with Prometheus metrics ==="; \
+	GW_P95=$$(curl -s 'http://localhost:9090/api/v1/query' --data-urlencode 'query=histogram_quantile(0.95,sum(rate(masterclass_http_request_duration_seconds_bucket{service="gateway",path="/api/classify"}[5m]))by(le))' | jq -r '.data.result[0].value[1] // "no data"'); \
+	MS_P95=$$(curl -s 'http://localhost:9090/api/v1/query' --data-urlencode 'query=histogram_quantile(0.95,sum(rate(masterclass_http_request_duration_seconds_bucket{service="model-service",path="/predict"}[5m]))by(le))' | jq -r '.data.result[0].value[1] // "no data"'); \
+	echo "Gateway /api/classify p95:       $${GW_P95} s"; \
+	echo "Model-service /predict p95:      $${MS_P95} s"
 
 demo-burst:
 	@for _ in $$(seq 1 12); do \

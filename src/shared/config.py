@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     inference_delay_seconds: float = 0.0
     public_api_url: str = "http://localhost:8080"
     grafana_public_url: str = "http://localhost:3000"
+    tempo_api_url: str = "http://tempo:3200"
     log_file_path: str = ""
     otel_exporter_endpoint: str = ""
     service_version: str = "0.1.0"

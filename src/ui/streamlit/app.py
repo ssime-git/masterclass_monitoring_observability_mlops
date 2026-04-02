@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import cast
 
 import requests
@@ -12,6 +13,12 @@ from ui.streamlit.grafana import (
     MONITORING_DASHBOARD_UID,
     OBSERVABILITY_DASHBOARD_UID,
     build_dashboard_url,
+)
+from ui.streamlit.tempo import (
+    TRACE_QUERY_OPTIONS,
+    build_trace_rows,
+    get_trace_query,
+    search_recent_traces,
 )
 
 ADMIN_USERNAME = "admin"
@@ -64,6 +71,44 @@ def render_observability_cockpit(grafana_url: str, last_request_id: str | None) 
     )
     if last_request_id is not None:
         st.info(f"Latest request id from the UI flow: `{last_request_id}`")
+    title_column, filter_column, action_column = st.columns([3, 2, 1])
+    title_column.markdown("#### Recent Tempo Traces")
+    selected_trace_filter = filter_column.selectbox(
+        "Trace filter",
+        options=[label for label, _ in TRACE_QUERY_OPTIONS],
+        index=0,
+        label_visibility="collapsed",
+        key="tempo-trace-filter",
+    )
+    refresh_requested = action_column.button("Refresh traces", key="refresh-tempo-traces")
+    if st.session_state.tempo_traces_last_refresh is None or refresh_requested:
+        st.session_state.tempo_traces_last_refresh = datetime.now(tz=UTC)
+    st.caption(
+        "Rendered directly in Streamlit because Grafana 11.6 dashboard Tempo search "
+        "queries are not supported in this stack."
+    )
+    st.caption(f"Filter: {selected_trace_filter}")
+    last_refresh = cast(datetime, st.session_state.tempo_traces_last_refresh)
+    st.caption(f"Last refreshed at {last_refresh.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    try:
+        traces = search_recent_traces(
+            settings.tempo_api_url,
+            query=get_trace_query(selected_trace_filter),
+        )
+    except requests.RequestException as exc:
+        st.warning(f"Unable to load Tempo traces: {exc}")
+    else:
+        if not traces:
+            st.info(f"No recent traces were found in Tempo for `{selected_trace_filter}`.")
+        else:
+            st.dataframe(
+                build_trace_rows(traces, grafana_url),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Grafana": st.column_config.LinkColumn("Grafana", display_text="Open trace"),
+                },
+            )
     components.iframe(
         build_dashboard_url(grafana_url, OBSERVABILITY_DASHBOARD_UID),
         height=1400,
@@ -82,6 +127,8 @@ if "username" not in st.session_state:
     st.session_state.username = None
 if "last_request_id" not in st.session_state:
     st.session_state.last_request_id = None
+if "tempo_traces_last_refresh" not in st.session_state:
+    st.session_state.tempo_traces_last_refresh = None
 
 with st.sidebar:
     st.subheader("Demo credentials")
