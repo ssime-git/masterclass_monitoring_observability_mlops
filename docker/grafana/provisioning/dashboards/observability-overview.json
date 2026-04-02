@@ -137,7 +137,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 16
       },
@@ -160,6 +160,39 @@
         }
       ],
       "title": "NGINX Access Logs",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "loki"
+      },
+      "description": "Requests rejected by the NGINX rate limiter before they reach the gateway.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{service=\"nginx\"} |= \"\\\"request_uri\\\":\\\"/auth/login\\\"\" |= \"\\\"status\\\":503\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Rate-Limited Login Requests",
       "type": "logs"
     },
     {

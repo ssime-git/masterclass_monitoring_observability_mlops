@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 
@@ -42,3 +43,29 @@ def test_observability_dashboard_avoids_unsupported_tempo_search_panel() -> None
 
     assert '"queryType": "nativeSearch"' not in dashboard_content
     assert '"type": "text"' in dashboard_content
+
+
+def test_observability_dashboard_includes_rate_limited_nginx_panel() -> None:
+    dashboard = json.loads(
+        Path("docker/grafana/provisioning/dashboards/observability-overview.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    panel = next(
+        item for item in dashboard["panels"] if item["title"] == "Rate-Limited Login Requests"
+    )
+
+    assert panel["description"] == (
+        "Requests rejected by the NGINX rate limiter before they reach the gateway."
+    )
+    assert panel["targets"] == [
+        {
+            "expr": (
+                '{service="nginx"} |= "\\"request_uri\\":\\"/auth/login\\"" '
+                '|= "\\"status\\":503"'
+            ),
+            "queryType": "range",
+            "refId": "A",
+        }
+    ]

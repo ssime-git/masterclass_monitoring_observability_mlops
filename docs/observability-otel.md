@@ -317,6 +317,7 @@ What changed operationally:
 How to explain it live:
 
 - Slow classify and blocked login are different investigation patterns.
+- The `Rate-Limited Login Requests` panel in the Observability Overview dashboard shows the exact rejected NGINX entries.
 - Logs and traces are useful, but you still need the edge story.
 
 ## Why Logs and Traces Complement Metrics
