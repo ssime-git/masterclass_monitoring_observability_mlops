@@ -16,5 +16,6 @@ dist/
 build/
 htmlcov/
 *.log
+*.txt
 Masterclass_Monitoring_Observabilite.pptx
 Masterclass_Monitoring_Observability_EN.pptx

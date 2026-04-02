@@ -31,10 +31,10 @@ test-streamlit:
 	$(UV) run pytest tests/streamlit
 
 up:
-	docker compose up --build
+	docker compose up --build -d
 
 down:
-	docker compose down --remove-orphans
+	docker compose down -v --remove-orphans --rmi all
 
 demo-ready:
 	@for url in "$(API_BASE_URL)/health" "$(PROM_BASE_URL)/-/ready" "$(GRAFANA_BASE_URL)/api/health"; do \
